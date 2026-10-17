@@ -1,0 +1,1669 @@
+ï»¿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CYBER HUD // PUJARI HEMESH // SEC_DEFENSE_SYS</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            obsidian: '#04070d', terminal: '#070d18', panel: '#0b1322', panelBorder: '#142742',
+            cyberCyan: '#06b6d4', neonGreen: '#10b981', amberAlert: '#f59e0b', dangerRed: '#f43f5e'
+          },
+          fontFamily: {
+            mono: ['"JetBrains Mono"', 'monospace'],
+            sans: ['"Space Grotesk"', 'sans-serif'],
+          },
+          boxShadow: {
+            'cyan-glow': '0 0 20px rgba(6, 182, 212, 0.3)',
+            'green-glow': '0 0 20px rgba(16, 185, 129, 0.3)',
+            'hud-card': '0 8px 32px 0 rgba(0, 0, 0, 0.55)',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { background-color: #04070d; color: #cbd5e1; font-family: 'Space Grotesk', sans-serif; overflow-x: hidden; min-height: 100vh; }
+    .scanlines {
+      background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0, 0, 0, 0.4) 50%, rgba(0, 0, 0, 0.4));
+      background-size: 100% 4px; pointer-events: none;
+    }
+    .cyber-grid {
+      background-image: 
+        radial-gradient(circle at 50% 20%, rgba(6, 182, 212, 0.08) 0%, transparent 65%),
+        linear-gradient(to right, rgba(20, 39, 66, 0.35) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(20, 39, 66, 0.35) 1px, transparent 1px);
+      background-size: 100% 100%, 36px 36px, 36px 36px;
+    }
+    .hud-box { position: relative; background: rgba(11, 19, 34, 0.85); border: 1px solid #142742; backdrop-filter: blur(12px); }
+    .hud-box::before {
+      content: ''; position: absolute; top: -1px; left: -1px; width: 10px; height: 10px;
+      border-top: 2px solid #06b6d4; border-left: 2px solid #06b6d4; pointer-events: none;
+    }
+    .hud-box::after {
+      content: ''; position: absolute; bottom: -1px; right: -1px; width: 10px; height: 10px;
+      border-bottom: 2px solid #10b981; border-right: 2px solid #10b981; pointer-events: none;
+    }
+    .page-view { display: none; opacity: 0; transform: scale(0.98) translateY(12px);
+      transition: opacity 0.32s cubic-bezier(0.16, 1, 0.3, 1), transform 0.32s cubic-bezier(0.16, 1, 0.3, 1); }
+    .page-view.active-page { display: block; opacity: 1; transform: scale(1) translateY(0); }
+    #warp-screen {
+      position: fixed; inset: 0; pointer-events: none; z-index: 60; opacity: 0;
+      background: linear-gradient(135deg, rgba(6, 182, 212, 0.12), rgba(16, 185, 129, 0.08));
+      backdrop-filter: blur(4px); transition: opacity 0.25s ease-in-out;
+    }
+    #warp-screen.warp-active { opacity: 1; }
+    .warp-sweep {
+      position: absolute; left: 0; right: 0; height: 3px; background: #06b6d4;
+      box-shadow: 0 0 15px #06b6d4, 0 0 30px #10b981; animation: sweepRadar 0.32s linear forwards;
+    }
+    @keyframes sweepRadar {
+      0% { top: 0%; opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { top: 100%; opacity: 0; }
+    }
+    .cursor-blink { display: inline-block; width: 8px; height: 1.15em; background-color: #10b981; vertical-align: -0.15em; animation: blink 0.9s step-start infinite; }
+    @keyframes blink { 0%, 50% { opacity: 1; } 50.1%, 100% { opacity: 0; } }
+
+    @keyframes glitch {
+      0% { clip: rect(44px, 9999px, 56px, 0); transform: skew(0.3deg); }
+      20% { clip: rect(12px, 9999px, 30px, 0); transform: skew(-0.5deg); }
+      40% { clip: rect(78px, 9999px, 96px, 0); transform: skew(0.8deg); }
+      60% { clip: rect(23px, 9999px, 67px, 0); transform: skew(-0.2deg); }
+      80% { clip: rect(91px, 9999px, 98px, 0); transform: skew(0.5deg); }
+      100% { clip: rect(12px, 9999px, 30px, 0); transform: skew(0deg); }
+    }
+
+    .glitch-active { animation: glitch 0.2s infinite; filter: hue-rotate(90deg); }
+    .crt-flicker { animation: flicker 0.15s infinite; }
+    @keyframes flicker {
+      0% { opacity: 0.97; } 5% { opacity: 0.95; } 10% { opacity: 0.9; } 15% { opacity: 0.98; } 20% { opacity: 0.92; } 100% { opacity: 1; }
+    }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #04070d; }
+    ::-webkit-scrollbar-thumb { background: #142742; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #06b6d4; }
+    .dock-btn > span:first-child { font-size: 1.2rem; line-height: 1; text-shadow: 0 0 8px currentColor; }
+    .dock-btn[data-dock-id="home"] > span:first-child { color: #06b6d4; font-weight: 700; }
+    .home-highlight-label { color: #67e8f9 !important; font-weight: 700; text-shadow: 0 0 7px rgba(6, 182, 212, .45); }
+    .home-highlight-copy { color: #e2e8f0 !important; font-weight: 700; }
+    .home-highlight-stat { padding: 2px 8px; border-left: 2px solid var(--stat-accent); border-radius: 3px; color: #e2e8f0; background: rgba(6, 182, 212, .06); }
+    .home-highlight-stat:nth-child(1) { --stat-accent: #10b981; }
+    .home-highlight-stat:nth-child(2) { --stat-accent: #06b6d4; }
+    .home-highlight-stat:nth-child(3) { --stat-accent: #f59e0b; }
+    .home-highlight-stat:nth-child(4) { --stat-accent: #a78bfa; }
+    .project-highlight { border-color: rgba(6, 182, 212, .85) !important; box-shadow: 0 0 24px rgba(6, 182, 212, .18), 0 8px 32px rgba(0, 0, 0, .55); background: rgba(6, 182, 212, .035); }
+    .project-highlight h3 { color: #67e8f9; text-shadow: 0 0 10px rgba(6, 182, 212, .28); }
+    #view-projects > .flex:first-child > div:last-child { color: #a5f3fc; background: rgba(6, 182, 212, .08); border: 1px solid rgba(6, 182, 212, .4); border-radius: .4rem; padding: .45rem .65rem; text-shadow: 0 0 8px rgba(6, 182, 212, .35); }
+    #view-projects .hud-box > .space-y-3 > .p-3.rounded { border-color: rgba(6, 182, 212, .42); box-shadow: inset 0 0 18px rgba(6, 182, 212, .045); }
+    #view-projects .hud-box > .space-y-3 > .flex.items-center > span.px-2.rounded { box-shadow: 0 0 10px rgba(6, 182, 212, .16); }
+    #view-projects .hud-box .flex.flex-wrap.gap-1\.5.pt-1 > span { color: #a5f3fc; border-color: rgba(6, 182, 212, .4); background: rgba(6, 182, 212, .07); box-shadow: 0 0 8px rgba(6, 182, 212, .1); }
+    #view-projects .hud-box > .space-y-3 > .p-3.rounded .text-neonGreen { text-shadow: 0 0 7px rgba(16, 185, 129, .45); }
+    .school-map-link { display: inline-flex; align-items: center; gap: .45rem; width: fit-content; margin-top: .2rem; padding: .45rem .7rem; border: 1px solid rgba(6, 182, 212, .75); border-radius: .45rem; background: rgba(6, 182, 212, .12); color: #67e8f9; font: 700 .8rem/1.4 ui-monospace, SFMono-Regular, monospace; letter-spacing: .04em; text-shadow: 0 0 9px rgba(6, 182, 212, .45); box-shadow: 0 0 15px rgba(6, 182, 212, .16); }
+    .school-map-link:hover { background: rgba(6, 182, 212, .24); color: #cffafe; box-shadow: 0 0 20px rgba(6, 182, 212, .3); }
+    @media (min-width: 640px) { .dock-btn > span:first-child { font-size: 1rem; } }
+  </style>
+</head>
+
+<body class="cyber-grid text-slate-300 selection:bg-cyan-500/30 selection:text-cyan-200 min-h-screen flex flex-col justify-between relative">
+
+  <div id="scanline-layer" class="scanlines crt-flicker fixed inset-0 z-50 pointer-events-none transition-opacity duration-300"></div>
+  <div id="warp-screen"><div id="warp-bar" class="warp-sweep"></div></div>
+
+  <!-- HEADER -->
+  <header class="fixed top-0 left-0 right-0 z-40 bg-obsidian/95 backdrop-blur-md border-b border-panelBorder px-4 py-2.5">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+      <div class="flex items-center space-x-3">
+        <button onclick="navigateToPage('home')" class="flex items-center gap-2 group text-left">
+          <span class="relative flex h-2.5 w-2.5">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyberCyan"></span>
+          </span>
+          <span class="font-bold text-white tracking-wider group-hover:text-cyberCyan transition">SYS.DEFENSE</span>
+        </button>
+        <div class="hidden sm:flex items-center gap-1.5 text-slate-400 border-l border-panelBorder pl-3 text-[11px]">
+          <span class="text-slate-500">SYS://HEMESH_PUJARI/</span>
+          <span id="hud-breadcrumb" class="text-neonGreen font-semibold">HUB</span>
+        </div>
+      </div>
+
+      <nav class="hidden lg:flex items-center space-x-1 font-mono text-xs">
+        <button onclick="navigateToPage('home')" data-nav-id="home" class="nav-btn px-3 py-1.5 rounded transition text-slate-300 hover:text-white hover:bg-panel border border-transparent">[1] HUB</button>
+        <button onclick="navigateToPage('projects')" data-nav-id="projects" class="nav-btn px-3 py-1.5 rounded transition text-slate-300 hover:text-white hover:bg-panel border border-transparent">[2] PROJECTS</button>
+        <button onclick="navigateToPage('academics')" data-nav-id="academics" class="nav-btn px-3 py-1.5 rounded transition text-slate-300 hover:text-white hover:bg-panel border border-transparent">[3] ACADEMICS</button>
+        <button onclick="navigateToPage('play')" data-nav-id="play" class="nav-btn px-3 py-1.5 rounded transition text-slate-300 hover:text-white hover:bg-panel border border-transparent">[4] PLAY</button>
+        <button onclick="navigateToPage('terminal')" data-nav-id="terminal" class="nav-btn px-3 py-1.5 rounded transition text-slate-300 hover:text-white hover:bg-panel border border-transparent">[5] TERMINAL</button>
+        <button onclick="navigateToPage('contact')" data-nav-id="contact" class="nav-btn px-3 py-1.5 rounded transition text-slate-300 hover:text-white hover:bg-panel border border-transparent">[6] DISPATCH</button>
+      </nav>
+
+      <div class="flex items-center space-x-2 sm:space-x-3">
+        <div class="hidden md:block text-slate-400 font-mono tracking-widest text-[11px]" id="hud-clock">00:00:00 UTC</div>
+        <button id="sfx-toggle-btn" class="px-2 py-1 border border-panelBorder rounded text-[11px] bg-panel hover:border-cyberCyan hover:text-cyberCyan transition flex items-center gap-1" title="Toggle Terminal Audio">
+          <span id="sfx-icon">🔊</span>
+          <span class="hidden sm:inline">SFX: <span id="sfx-status">ON</span></span>
+        </button>
+        <button id="scanline-toggle-btn" class="px-2 py-1 border border-panelBorder rounded text-[11px] bg-panel hover:border-neonGreen hover:text-neonGreen transition" title="Toggle CRT Filter">
+          CRT: <span id="scanline-status">ON</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="max-w-7xl mx-auto w-full px-4 sm:px-6 pt-24 pb-28 min-h-[calc(100vh-140px)]">
+
+    <!-- PAGE 1: HOME -->
+    <section id="view-home" class="page-view active-page space-y-10">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+        <div class="lg:col-span-7 space-y-6">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded bg-cyan-950/40 border border-cyberCyan/30 text-cyberCyan text-xs font-mono">
+            <span class="h-2 w-2 rounded-full bg-cyberCyan animate-pulse"></span>
+            DEFENSE DIRECTIVE ACTIVE // CLEARANCE: SEC_ENGINEER
+          </div>
+
+          <div class="space-y-2">
+            <div class="text-xs font-mono text-neonGreen uppercase tracking-widest flex items-center gap-2">
+              <span>// OPERATOR IDENTIFIER:</span>
+              <span class="text-slate-400">HEMESH PUJARI (PUJARI HEMESH)</span>
+            </div>
+            <h1 class="text-4xl sm:text-6xl font-bold tracking-tight text-white font-sans">
+              Hemesh Pujari<span class="text-cyberCyan">.</span>
+            </h1>
+            <div class="h-8 flex items-center font-mono text-base sm:text-xl text-slate-300">
+              <span class="text-cyberCyan mr-2">&gt;</span>
+              <span id="typewriter-hero" class="text-neonGreen font-semibold"></span>
+              <span class="cursor-blink"></span>
+            </div>
+          </div>
+
+          <p class="text-slate-300 text-sm sm:text-base leading-relaxed max-w-2xl">
+            Computer Science & Engineering scholar at <strong class="text-white">SCSVMV University (2024–2028)</strong> focusing on 
+            adversarial cyber defense, File Integrity Monitoring (FIM), socket-level network telemetry, and digital logic synthesis. 
+            Engineering robust computing nodes built to endure hostile environments.
+          </p>
+
+          <!-- Core Telemetry Grid -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs max-w-2xl">
+            <div class="p-3 bg-panel border border-panelBorder rounded hud-box">
+              <span class="block text-slate-500 mb-1 home-highlight-label">PROGRAM</span>
+              <span class="text-slate-100 font-semibold">B.E. CSE (2024–2028)</span>
+            </div>
+            <div class="p-3 bg-panel border border-panelBorder rounded hud-box">
+              <span class="block text-slate-500 mb-1 home-highlight-label">INSTITUTION</span>
+              <span class="text-slate-100 font-semibold">SCSVMV UNIVERSITY</span>
+            </div>
+            <div class="p-3 bg-panel border border-panelBorder rounded hud-box">
+              <span class="block text-slate-500 mb-1 home-highlight-label">INTERMEDIATE</span>
+              <span id="intermediate-score" class="font-semibold block transition-colors duration-300">80.8%</span>
+              <span class="text-slate-500 block text-[10px] mt-0.5 home-highlight-copy">SRI SAI JR COLLEGE</span>
+            </div>
+            <div class="p-3 bg-panel border border-panelBorder rounded col-span-2 sm:col-span-1 hud-box">
+              <span class="block text-slate-500 mb-1 home-highlight-label">CREDENTIALS</span>
+              <span class="text-neonGreen font-semibold block">CERTX AI CERTIFIED</span>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap gap-3 pt-2 font-mono text-xs">
+            <button onclick="navigateToPage('projects')" class="px-5 py-3 rounded bg-cyberCyan text-obsidian font-bold hover:bg-cyan-300 transition shadow-cyan-glow flex items-center gap-2">
+              <span>EXPLORE PROJECTS</span><span>&rarr;</span>
+            </button>
+            <button onclick="navigateToPage('skills')" class="px-5 py-3 rounded bg-panel border border-panelBorder hover:border-neonGreen text-slate-200 hover:text-neonGreen transition flex items-center gap-2">
+              <span>VIEW SKILLS</span><span>&rarr;</span>
+            </button>
+            <button onclick="navigateToPage('terminal')" class="px-5 py-3 rounded bg-panel border border-panelBorder hover:border-neonGreen text-slate-200 hover:text-neonGreen transition flex items-center gap-2">
+              <span>LAUNCH TERMINAL</span><span>[&gt;_]</span>
+            </button>
+            <a href="https://github.com/Hemesh1211" target="_blank" rel="noreferrer"
+               class="px-5 py-3 rounded bg-panel border border-panelBorder hover:border-white text-slate-200 hover:text-white transition flex items-center gap-2">
+              <span>GITHUB</span><span>[🐙]</span>
+            </a>
+            <a href="https://www.linkedin.com/in/pujarihemesh12?utm_source=share_via&utm_content=profile&utm_medium=member_android" target="_blank" rel="noreferrer"
+               class="px-5 py-3 rounded bg-panel border border-panelBorder hover:border-cyberCyan text-slate-200 hover:text-cyberCyan transition flex items-center gap-2">
+              <span>LINKEDIN</span><span>[↗]</span>
+            </a>
+          </div>
+
+          <!-- Quick Stats Pill Bar -->
+          <div class="flex flex-col items-start gap-2 text-xs font-mono text-slate-500 pt-1">
+            <div class="home-highlight-stat flex items-center gap-1.5"><span class="text-neonGreen">●</span> 4 DEPLOYED SYSTEMS</div>
+            <div class="home-highlight-stat flex items-center gap-1.5"><span class="text-cyberCyan">●</span> 100% SHA-256 FIM VERIFIED</div>
+            <div class="home-highlight-stat flex items-center gap-1.5"><span class="text-amberAlert">●</span> WIRE-SPEED TELEMETRY</div>
+            <div class="home-highlight-stat flex items-center gap-1.5"><span class="text-neonGreen">●</span> JEE MAINS: 91.963 %ile</div>
+          </div>
+
+          <div class="hud-box p-4 rounded-xl border border-panelBorder mt-2">
+            <div class="text-xs font-mono text-cyberCyan tracking-widest">// CURRENT MISSION</div>
+            <h2 class="text-base font-bold text-white mt-2">B.E. Computer Science & Engineering Student</h2>
+            <p class="text-xs text-slate-400 leading-relaxed mt-1">Currently studying at SCSVMV University (2024–2028), with a focus on cybersecurity, file integrity monitoring, network telemetry, and digital logic.</p>
+          </div>
+        </div>
+
+        <div class="lg:col-span-5 relative">
+          <div class="hud-box rounded-xl p-3 border border-panelBorder shadow-2xl relative overflow-hidden">
+            <div class="flex items-center justify-between pb-2 mb-2 border-b border-panelBorder/70 text-xs font-mono">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-cyberCyan animate-pulse"></span>
+                <span class="text-cyberCyan font-semibold">SPATIAL DEFENSE CORE</span>
+              </div>
+              <div class="text-[11px] text-slate-500">ORBIT / DRAG TO ROTATE</div>
+            </div>
+            <div id="three-core-viewport" class="w-full h-80 sm:h-96 rounded relative cursor-grab active:cursor-grabbing bg-obsidian/70 overflow-hidden">
+              <div id="three-loading-state" class="absolute inset-0 flex items-center justify-center font-mono text-xs text-slate-500">
+                [SYNCHRONIZING THREE.JS 3D MESH PIPELINE...]
+              </div>
+            </div>
+            <div class="pt-3 mt-1 grid grid-cols-3 gap-2 text-[11px] font-mono text-slate-400 border-t border-panelBorder/60">
+              <div><span aria-label="Rotation">↻</span> <span id="telemetry-euler" class="text-slate-200">0.0°</span></div>
+              <div>CORE: <span class="text-neonGreen">ACTIVE</span></div>
+              <div class="text-right">NODES: <span class="text-cyberCyan">280 PTS</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- PAGE 2: PROJECTS -->
+    <section id="view-projects" class="page-view space-y-6">
+      <div class="flex flex-col md:flex-row md:items-end justify-between gap-2 border-b border-panelBorder pb-4">
+        <div>
+          <div class="text-xs font-mono text-neonGreen tracking-widest">// REPOSITORY & TELEMETRY LAB</div>
+          <h2 class="text-2xl sm:text-4xl font-bold text-white tracking-tight">Active Deployments & Systems Built</h2>
+        </div>
+        <div class="text-xs font-mono text-slate-400">OPERATIONAL STATE: <span class="text-neonGreen">ONLINE // 6 NODES</span></div>
+      </div>
+
+      <div id="sim-telemetry-banner" class="hidden hud-box p-4 rounded-xl border border-neonGreen text-xs font-mono text-neonGreen animate-pulse">
+        <span id="sim-telemetry-text">[STATUS] Telemetry dispatched successfully.</span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="hud-box rounded-xl p-5 border border-panelBorder hover:border-cyberCyan transition-all duration-300 flex flex-col justify-between group">
+          <div class="space-y-3">
+            <div class="flex items-center justify-between text-xs font-mono">
+              <span class="text-cyberCyan font-semibold">// OP_SWISS_RECON</span>
+              <span class="px-2 py-0.5 rounded bg-cyan-950/60 text-cyberCyan border border-cyberCyan/30 text-[10px]">RECONNAISSANCE</span>
+            </div>
+            <h3 class="text-xl font-bold text-white group-hover:text-cyberCyan transition-colors">Swiss Army Recon Tool</h3>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              Modular information-gathering engine that automates DNS enumeration, multi-threaded port scanning, and HTTP security header auditing.
+              Designed for efficient attack surface mapping.
+            </p>
+            <div class="p-3 rounded bg-obsidian border border-panelBorder/80 font-mono text-[11px] space-y-1.5">
+              <div class="text-slate-500">// Tool Capabilities:</div>
+              <div class="flex justify-between text-slate-400">
+                <span>DNS Enum: <span class="text-neonGreen">ACTIVE</span></span>
+                <span>Ports: <span class="text-cyberCyan">MULTI-THREADED</span></span>
+              </div>
+              <div class="flex justify-between text-slate-400">
+                <span>Security Audit: <span class="text-neonGreen">ENABLED</span></span>
+                <span>Version: <span class="text-slate-200">v1.0</span></span>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-1.5 pt-1">
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Python 3</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Socket Programming</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">DNS Resolver</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">HTTP Analysis</span>
+            </div>
+          </div>
+          <div class="pt-5 mt-4 border-t border-panelBorder/70 flex items-center justify-between text-xs font-mono">
+            <a href="https://github.com/Hemesh1211/SwissArmyRecon.git" target="_blank" rel="noopener noreferrer" class="text-cyberCyan hover:text-white flex items-center gap-1.5 transition">[↗] OPEN GITHUB REPOSITORY</a>
+            <span class="text-slate-500">ID: HP-RECON-07</span>
+          </div>
+        </div>
+        <div class="hud-box rounded-xl p-5 border border-panelBorder hover:border-cyberCyan transition-all duration-300 flex flex-col justify-between group">
+          <div class="space-y-3">
+            <div class="flex items-center justify-between text-xs font-mono">
+              <span class="text-cyberCyan font-semibold">// OP_SECURE_CODE</span>
+              <span class="px-2 py-0.5 rounded bg-cyan-950/60 text-cyberCyan border border-cyberCyan/30 text-[10px]">APPSEC</span>
+            </div>
+            <h3 class="text-xl font-bold text-white group-hover:text-cyberCyan transition-colors">Vulnerable Web App Lab</h3>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              Educational environment demonstrating SQL Injection vulnerabilities and their remediation. Includes a "Broken" version and a "Hardened" version to showcase secure coding practices.
+            </p>
+            <div class="p-3 rounded bg-obsidian border border-panelBorder/80 font-mono text-[11px] space-y-1.5">
+              <div class="text-slate-500">// Vulnerability Analysis:</div>
+              <div class="flex justify-between text-slate-400">
+                <span>Attack: <span class="text-dangerRed">SQL Injection</span></span>
+                <span>Fix: <span class="text-neonGreen">Parameterized Queries</span></span>
+              </div>
+              <div class="flex justify-between text-slate-400">
+                <span>Impact: <span class="text-dangerRed">Data Exfiltration</span></span>
+                <span class="text-slate-200">Status: <span class="text-neonGreen">FIXED</span></span>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-1.5 pt-1">
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Python/Flask</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">SQLite</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">OWASP Top 10</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Secure Coding</span>
+            </div>
+          </div>
+          <div class="pt-5 mt-4 border-t border-panelBorder/70 flex items-center justify-between text-xs font-mono">
+            <a href="https://github.com/Hemesh1211/Cyber-Security-Projects" target="_blank" rel="noopener noreferrer" class="text-cyberCyan hover:text-white flex items-center gap-1.5 transition">[↗] OPEN REPOSITORY</a>
+            <span class="text-slate-500">ID: HP-APP-07</span>
+          </div>
+        </div>
+        <div class="hud-box rounded-xl p-5 border border-panelBorder hover:border-neonGreen transition-all duration-300 flex flex-col justify-between group">
+          <div class="space-y-3">
+            <div class="flex items-center justify-between text-xs font-mono">
+              <span class="text-neonGreen font-semibold">// OP_SUB_HUNT</span>
+              <span class="px-2 py-0.5 rounded bg-emerald-950/60 text-neonGreen border border-neonGreen/30 text-[10px]">RECONNAISSANCE</span>
+            </div>
+            <h3 class="text-xl font-bold text-white group-hover:text-neonGreen transition-colors">Subdomain Finder Tool</h3>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              Automated reconnaissance engine that identifies hidden subdomains using dictionary-based DNS enumeration. Essential for attack surface mapping and finding "Shadow IT" assets.
+            </p>
+            <div class="p-3 rounded bg-obsidian border border-panelBorder/80 font-mono text-[11px] space-y-1.5">
+              <div class="text-slate-500">// Recon Telemetry:</div>
+              <div class="flex justify-between text-slate-400">
+                <span>Method: <span class="text-neonGreen">Dictionary Attack</span></span>
+                <span class="text-cyberCyan">DNS Resolution</span>
+              </div>
+              <div class="flex justify-between text-slate-400">
+                <span>Handling: <span class="text-neonGreen">Async-Ready</span></span>
+                <span class="text-slate-200">Status: <span class="text-neonGreen">OPERATIONAL</span></span>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-1.5 pt-1">
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Python 3</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">HTTP Requests</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">DNS Enumeration</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">OSINT</span>
+            </div>
+          </div>
+          <div class="pt-5 mt-4 border-t border-panelBorder/70 flex items-center justify-between text-xs font-mono">
+            <a href="https://github.com/Hemesh1211/Cyber-Security-Projects" target="_blank" rel="noopener noreferrer" class="text-neonGreen hover:text-white flex items-center gap-1.5 transition">[↗] OPEN REPOSITORY</a>
+            <span class="text-slate-500">ID: HP-RECON-08</span>
+          </div>
+        </div>
+        <div class="hud-box rounded-xl p-5 border border-panelBorder hover:border-neonGreen transition-all duration-300 flex flex-col justify-between group">
+          <div class="space-y-3">
+            <div class="flex items-center justify-between text-xs font-mono">
+              <span class="text-neonGreen font-semibold">// OP_SIEM_SENTINEL</span>
+              <span class="px-2 py-0.5 rounded bg-emerald-950/60 text-neonGreen border border-neonGreen/30 text-[10px]">BLUE TEAM / DEFENSE</span>
+            </div>
+            <h3 class="text-xl font-bold text-white group-hover:text-neonGreen transition-colors">Mini-SIEM Sentinel</h3>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              Real-time log analysis engine that detects Brute Force attacks using sliding-window time thresholds and dispatches instant security alerts via Webhooks.
+            </p>
+            <div class="p-3 rounded bg-obsidian border border-panelBorder/80 font-mono text-[11px] space-y-1.5">
+              <div class="text-slate-500">// Defense Telemetry:</div>
+              <div class="flex justify-between text-slate-400">
+                <span>Detection: <span class="text-neonGreen">Regex Pattern</span></span>
+                <span class="text-cyberCyan">Log Tailing</span>
+              </div>
+              <div class="flex justify-between text-slate-400">
+                <span>Alerting: <span class="text-neonGreen">Webhook API</span></span>
+                <span class="text-slate-200">Status: <span class="text-neonGreen">ACTIVE</span></span>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-1.5 pt-1">
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Python 3</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Log Parsing</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">SIEM Logic</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Incident Response</span>
+            </div>
+          </div>
+          <div class="pt-5 mt-4 border-t border-panelBorder/70 flex items-center justify-between text-xs font-mono">
+            <a href="https://github.com/Hemesh1211/Mini-SIEM-Sentinel.git" target="_blank" rel="noopener noreferrer" class="text-neonGreen hover:text-white flex items-center gap-1.5 transition">[↗] OPEN REPOSITORY</a>
+            <span class="text-slate-500">ID: HP-SEC-08</span>
+          </div>
+        </div>
+        <div class="hud-box rounded-xl p-5 border border-panelBorder hover:border-cyberCyan transition-all duration-300 flex flex-col justify-between group">
+          <div class="space-y-3">
+            <div class="flex items-center justify-between text-xs font-mono">
+              <span class="text-cyberCyan font-semibold">// OP_AETHER_FIM</span>
+              <span class="px-2 py-0.5 rounded bg-cyan-950/60 text-cyberCyan border border-cyberCyan/30 text-[10px]">CORE ARCHITECTURE</span>
+            </div>
+            <h3 class="text-xl font-bold text-white group-hover:text-cyberCyan transition-colors">File Integrity Monitoring (FIM) Engine</h3>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              Automated cryptographic sentinel that scans local storage trees, computes baseline SHA-256 hashes, 
+              detects unauthorized file mutations or unprivileged permission changes, and fires instant security alert dispatches.
+            </p>
+            <div class="p-3 rounded bg-obsidian border border-panelBorder/80 font-mono text-[11px] space-y-1.5">
+              <div class="text-slate-500">// SHA-256 Checksum Verification:</div>
+              <div class="text-neonGreen truncate font-mono">HASH: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08</div>
+              <div class="flex justify-between text-slate-400">
+                <span>Tamper Latency: <span class="text-cyberCyan">&lt; 15ms</span></span>
+                <span>Audit Status: <span class="text-neonGreen">CONTINUOUS</span></span>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-1.5 pt-1">
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Python 3</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">SHA-256</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">OS Telemetry</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Alert Dispatch</span>
+            </div>
+          </div>
+          <div class="pt-5 mt-4 border-t border-panelBorder/70 flex items-center justify-between text-xs font-mono">
+            <button onclick="triggerFimTest()" class="text-cyberCyan hover:text-white flex items-center gap-1.5 transition">[⚡] RUN TAMPER SIMULATION</button>
+            <span class="text-slate-500">ID: HP-SEC-01</span>
+          </div>
+        </div>
+
+        <div class="hud-box project-highlight rounded-xl p-5 border border-panelBorder hover:border-neonGreen transition-all duration-300 flex flex-col justify-between group">
+          <div class="space-y-3">
+            <div class="flex items-center justify-between text-xs font-mono">
+              <span class="text-neonGreen font-semibold">// OP_NET_SENTINEL</span>
+              <span class="px-2 py-0.5 rounded bg-emerald-950/60 text-neonGreen border border-neonGreen/30 text-[10px]">NETWORK PROTOCOL</span>
+            </div>
+            <h3 class="text-xl font-bold text-white group-hover:text-neonGreen transition-colors">Network Packet Inspector & Sentinel</h3>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              Low-overhead raw socket sniffer designed to unpack Ethernet frames, parse IP/TCP headers, decode payload payloads, 
+              and flag malformed SYN floods and unexpected port scans across local subnets.
+            </p>
+            <div class="p-3 rounded bg-obsidian border border-panelBorder/80 font-mono text-[11px] space-y-1.5">
+              <div class="text-slate-500">// Protocol Distribution:</div>
+              <div class="grid grid-cols-3 gap-2 text-center">
+                <div class="p-1 rounded bg-panel"><span class="text-cyberCyan">TCP: 64%</span></div>
+                <div class="p-1 rounded bg-panel"><span class="text-neonGreen">UDP: 28%</span></div>
+                <div class="p-1 rounded bg-panel"><span class="text-amberAlert">ICMP: 8%</span></div>
+              </div>
+              <div class="flex justify-between text-slate-400 pt-1">
+                <span>Capture Buffer: <span class="text-slate-200">RingBuffer 64MB</span></span>
+                <span>Port Sweep Alarm: <span class="text-neonGreen">ARMED</span></span>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-1.5 pt-1">
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Raw Sockets</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Wireshark Protocol</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Python</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Traffic Forensics</span>
+            </div>
+          </div>
+          <div class="pt-5 mt-4 border-t border-panelBorder/70 flex items-center justify-between text-xs font-mono">
+            <button onclick="triggerPacketCapture()" class="text-neonGreen hover:text-white flex items-center gap-1.5 transition">[⚡] INJECT TEST PACKET</button>
+            <span class="text-slate-500">ID: HP-SEC-02</span>
+          </div>
+        </div>
+
+        <div class="hud-box rounded-xl p-5 border border-panelBorder hover:border-amberAlert transition-all duration-300 flex flex-col justify-between group">
+          <div class="space-y-3">
+            <div class="flex items-center justify-between text-xs font-mono">
+              <span class="text-amberAlert font-semibold">// OP_LOGIC_SYNTH</span>
+              <span class="px-2 py-0.5 rounded bg-amber-950/60 text-amberAlert border border-amberAlert/30 text-[10px]">DIGITAL SYSTEMS</span>
+            </div>
+            <h3 class="text-xl font-bold text-white group-hover:text-amberAlert transition-colors">Digital Logic Circuit Synthesizer</h3>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              Interactive simulator modeling hardware logic gates (AND, OR, XOR, NAND), 8-to-3 priority encoders, 
+              and binary decoders. Computes minterms and produces truth tables for verifying digital designs.
+            </p>
+            <div class="p-3 rounded bg-obsidian border border-panelBorder/80 font-mono text-[11px] space-y-1.5">
+              <div class="text-slate-500">// Hardware Logic Truth State:</div>
+              <div class="flex justify-between text-slate-300">
+                <span>Inputs [A=1, B=0, C=1]:</span>
+                <span class="text-amberAlert font-bold">OUT [Y=1, V=1]</span>
+              </div>
+              <div class="flex justify-between text-slate-400">
+                <span>Gate Propagation Delay:</span>
+                <span class="text-neonGreen">~ 3.2 ns</span>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-1.5 pt-1">
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Digital Electronics</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Boolean Algebra</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Combinational Logic</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">C++</span>
+            </div>
+          </div>
+          <div class="pt-5 mt-4 border-t border-panelBorder/70 flex items-center justify-between text-xs font-mono">
+            <button onclick="triggerLogicCycle()" class="text-amberAlert hover:text-white flex items-center gap-1.5 transition">[⚡] CYCLE LOGIC GATE</button>
+            <span class="text-slate-500">ID: HP-SYS-03</span>
+          </div>
+        </div>
+
+        <div class="hud-box rounded-xl p-5 border border-panelBorder hover:border-cyberCyan transition-all duration-300 flex flex-col justify-between group">
+          <div class="space-y-3">
+            <div class="flex items-center justify-between text-xs font-mono">
+              <span class="text-cyberCyan font-semibold">// OP_CIPHER_VAULT</span>
+              <span class="px-2 py-0.5 rounded bg-cyan-950/60 text-cyberCyan border border-cyberCyan/30 text-[10px]">CRYPTOGRAPHY</span>
+            </div>
+            <h3 class="text-xl font-bold text-white group-hover:text-cyberCyan transition-colors">Encrypted Messaging & Secret Enclave</h3>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              End-to-end cryptographic handshake prototype implementing asymmetric key exchanges, AES-256 payload encryption, 
+              and ephemeral message verification to prevent eavesdropping and man-in-the-middle attacks.
+            </p>
+            <div class="p-3 rounded bg-obsidian border border-panelBorder/80 font-mono text-[11px] space-y-1.5">
+              <div class="text-slate-500">// Handshake Protocol:</div>
+              <div class="flex justify-between text-slate-400">
+                <span>Cipher: <span class="text-cyberCyan">AES-256-GCM</span></span>
+                <span>Integrity: <span class="text-neonGreen">HMAC-SHA256</span></span>
+              </div>
+              <div class="flex justify-between text-slate-400">
+                <span>Forward Secrecy:</span>
+                <span class="text-neonGreen">Diffie-Hellman Ephemeral</span>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-1.5 pt-1">
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Cryptography</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">AES-256</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Key Exchange</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Python</span>
+            </div>
+          </div>
+          <div class="pt-5 mt-4 border-t border-panelBorder/70 flex items-center justify-between text-xs font-mono">
+            <button onclick="triggerCryptoHandshake()" class="text-cyberCyan hover:text-white flex items-center gap-1.5 transition">[⚡] SIMULATE HANDSHAKE</button>
+            <span class="text-slate-500">ID: HP-CRYPTO-04</span>
+          </div>
+        </div>
+
+        <div class="hud-box rounded-xl p-5 border border-panelBorder hover:border-neonGreen transition-all duration-300 flex flex-col justify-between group">
+          <div class="space-y-3">
+            <div class="flex items-center justify-between text-xs font-mono">
+              <span class="text-neonGreen font-semibold">// OP-SENTINEL-AI</span>
+              <span class="px-2 py-0.5 rounded bg-emerald-950/60 text-neonGreen border border-neonGreen/30 text-[10px]">AI SECURITY</span>
+            </div>
+            <h3 class="text-xl font-bold text-white group-hover:text-neonGreen transition-colors">OP-SENTINEL-AI</h3>
+            <p class="text-xs text-slate-300 leading-relaxed">Autonomous threat intelligence agent that leverages LLMs to analyze security logs in real-time, correlating disparate events into actionable threat reports and automated mitigation scripts.</p>
+<div class="p-3 rounded bg-obsidian border border-panelBorder/80 font-mono text-[11px] space-y-1.5">
+  <div class="text-slate-500">// AI Analysis Engine:</div>
+  <div class="flex justify-between text-slate-400">
+    <span>Model: <span class="text-neonGreen">GPT-4o-Sec</span></span>
+    <span>Latency: <span class="text-cyberCyan">240ms</span></span>
+  </div>
+  <div class="flex justify-between text-slate-400">
+    <span>Confidence: <span class="text-neonGreen">98.2%</span></span>
+    <span>Threats: <span class="text-neonGreen">Active</span></span>
+  </div>
+</div>
+          </div>
+          <div class="pt-5 mt-4 border-t border-panelBorder/70 flex items-center justify-between text-xs font-mono">
+            <a href="https://github.com/Hemesh1211/OP-SENTINEL-AI" target="_blank" rel="noopener noreferrer" class="text-neonGreen hover:text-white flex items-center gap-1.5 transition">[↗] OPEN GITHUB REPOSITORY</a>
+            <span class="text-slate-500">ID: HP-AI-05</span>
+          </div>
+        </div>
+
+        <div class="hud-box rounded-xl p-5 border border-panelBorder hover:border-cyberCyan transition-all duration-300 flex flex-col justify-between group">
+          <div class="space-y-3">
+            <div class="flex items-center justify-between text-xs font-mono">
+              <span class="text-cyberCyan font-semibold">// OP_SILENT_TUNNEL</span>
+              <span class="px-2 py-0.5 rounded bg-cyan-950/60 text-cyberCyan border border-cyberCyan/30 text-[10px]">NETWORK TUNNEL</span>
+            </div>
+            <h3 class="text-xl font-bold text-white group-hover:text-cyberCyan transition-colors">OP_SILENT_TUNNEL</h3>
+            <p class="text-xs text-slate-300 leading-relaxed">Stealthy network encapsulation tool designed for bypassing restrictive firewalls using custom DNS/ICMP tunneling protocols to maintain secure, undetected remote access.</p>
+<div class="p-3 rounded bg-obsidian border border-panelBorder/80 font-mono text-[11px] space-y-1.5">
+  <div class="text-slate-500">// Tunneling Protocol:</div>
+  <div class="flex justify-between text-slate-400">
+    <span>Carrier: <span class="text-cyberCyan">DNS/ICMP</span></span>
+    <span>Encryption: <span class="text-neonGreen">ChaCha20</span></span>
+  </div>
+  <div class="flex justify-between text-slate-400">
+    <span>MTU: <span class="text-slate-200">576 bytes</span></span>
+    <span>Stealth: <span class="text-neonGreen">MAX</span></span>
+  </div>
+</div>
+          </div>
+          <div class="pt-5 mt-4 border-t border-panelBorder/70 flex items-center justify-between text-xs font-mono">
+            <a href="https://github.com/Hemesh1211/-OP_SILENT_TUNNEL" target="_blank" rel="noopener noreferrer" class="text-cyberCyan hover:text-white flex items-center gap-1.5 transition">[↗] OPEN GITHUB REPOSITORY</a>
+            <span class="text-slate-500">ID: HP-NET-06</span>
+          </div>
+        </div>
+
+
+
+        <!-- Cloud Leak Scanner -->
+        <div class="hud-box rounded-xl p-5 border border-panelBorder hover:border-amberAlert transition-all duration-300 flex flex-col justify-between group">
+          <div class="space-y-3">
+            <div class="flex items-center justify-between text-xs font-mono">
+              <span class="text-amberAlert font-semibold">// OP_CLOUD_LEAK_SCANNER</span>
+              <span class="px-2 py-0.5 rounded bg-amber-950/60 text-amberAlert border border-amberAlert/30 text-[10px]">CLOUD SECURITY</span>
+            </div>
+            <h3 class="text-xl font-bold text-white group-hover:text-amberAlert transition-colors">Cloud Leak Scanner</h3>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              A Python and Boto3 learning tool that checks whether anonymous users can list objects in specified Amazon S3 buckets. It reports common AWS access responses to help understand cloud-storage permissions.
+            </p>
+            <div class="p-3 rounded bg-obsidian border border-panelBorder/80 font-mono text-[11px] space-y-1.5">
+              <div class="text-slate-500">// Cloud Access Telemetry:</div>
+              <div class="flex justify-between text-slate-400 gap-3">
+                <span>Check: <span class="text-neonGreen">ANONYMOUS LISTING</span></span>
+                <span>Service: <span class="text-cyberCyan">AMAZON S3</span></span>
+              </div>
+              <div class="flex justify-between text-slate-400 gap-3">
+                <span>SDK: <span class="text-cyberCyan">BOTO3</span></span>
+                <span>Scope: <span class="text-amberAlert">AUTHORIZED TESTS</span></span>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-1.5 pt-1">
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Python 3</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Boto3</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Amazon S3</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Cloud Security</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Access Control</span>
+            </div>
+          </div>
+          <div class="pt-5 mt-4 border-t border-panelBorder/70 flex items-center justify-between text-xs font-mono">
+            <a href="https://github.com/Hemesh1211/cloud-leak-scanner.git" target="_blank" rel="noopener noreferrer" class="text-amberAlert hover:text-white flex items-center gap-1.5 transition">[↗] OPEN GITHUB REPOSITORY</a>
+            <span class="text-slate-500">ID: HP-CLOUD-12</span>
+          </div>
+        </div>
+
+        <!-- Python DNS Analyzer -->
+        <div class="hud-box rounded-xl p-5 border border-panelBorder hover:border-cyberCyan transition-all duration-300 flex flex-col justify-between group">
+          <div class="space-y-3">
+            <div class="flex items-center justify-between text-xs font-mono">
+              <span class="text-cyberCyan font-semibold">// OP_DNS_ANALYZER</span>
+              <span class="px-2 py-0.5 rounded bg-cyan-950/60 text-cyberCyan border border-cyberCyan/30 text-[10px]">DNS MONITORING</span>
+            </div>
+            <h3 class="text-xl font-bold text-white group-hover:text-cyberCyan transition-colors">Python DNS Analyzer</h3>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              Beginner-friendly DNS security lab built with Python and Scapy. Observes visible DNS queries on UDP port 53, filters requests for a configurable test domain, and includes a local HTTP demo server for learning how DNS queries and response integrity work.
+            </p>
+            <div class="p-3 rounded bg-obsidian border border-panelBorder/80 font-mono text-[11px] space-y-1.5">
+              <div class="text-slate-500">// DNS Monitoring Telemetry:</div>
+              <div class="flex justify-between text-slate-400 gap-3">
+                <span>Capture: <span class="text-neonGreen">UDP PORT 53</span></span>
+                <span>Filter: <span class="text-cyberCyan">TEST DOMAIN</span></span>
+              </div>
+              <div class="flex justify-between text-slate-400 gap-3">
+                <span>Demo Server: <span class="text-neonGreen">127.0.0.1:8000</span></span>
+                <span>Mode: <span class="text-amberAlert">EDUCATIONAL</span></span>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-1.5 pt-1">
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Python 3</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Scapy</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">DNS</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Npcap</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">HTTP Server</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Defensive Security</span>
+            </div>
+          </div>
+          <div class="pt-5 mt-4 border-t border-panelBorder/70 flex items-center justify-between text-xs font-mono">
+            <a href="https://github.com/Hemesh1211/python-dns-analyzer.git" target="_blank" rel="noopener noreferrer" class="text-cyberCyan hover:text-white flex items-center gap-1.5 transition">[↗] OPEN GITHUB REPOSITORY</a>
+            <span class="text-slate-500">ID: HP-DNS-10</span>
+          </div>
+        </div>
+
+        <!-- EDR Sentinel -->
+        <div class="hud-box project-highlight rounded-xl p-5 border border-panelBorder hover:border-neonGreen transition-all duration-300 flex flex-col justify-between group">
+          <div class="space-y-3">
+            <div class="flex items-center justify-between text-xs font-mono">
+              <span class="text-neonGreen font-semibold">// OP_EDR_SENTINEL</span>
+              <span class="px-2 py-0.5 rounded bg-emerald-950/60 text-neonGreen border border-neonGreen/30 text-[10px]">ENDPOINT DEFENSE</span>
+            </div>
+            <h3 class="text-xl font-bold text-white group-hover:text-neonGreen transition-colors">EDR Sentinel</h3>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              Python desktop-based Endpoint Detection and Response simulation. Monitors running processes, compares executable names against a configurable blacklist, logs matching PIDs, and provides a manual review workflow with a response action restricted to a dedicated test process.
+            </p>
+            <div class="p-3 rounded bg-obsidian border border-panelBorder/80 font-mono text-[11px] space-y-1.5">
+              <div class="text-slate-500">// Endpoint Detection Telemetry:</div>
+              <div class="flex justify-between text-slate-400 gap-3">
+                <span>Detection: <span class="text-neonGreen">PROCESS BLACKLIST</span></span>
+                <span>Interface: <span class="text-cyberCyan">TKINTER GUI</span></span>
+              </div>
+              <div class="flex justify-between text-slate-400 gap-3">
+                <span>Response: <span class="text-amberAlert">MANUAL / RESTRICTED</span></span>
+                <span>Status: <span class="text-neonGreen">DETECTION DEMO</span></span>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-1.5 pt-1">
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Python</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Tkinter</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">psutil</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Process Monitoring</span>
+              <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-panel border border-panelBorder text-slate-300">Blue Team</span>
+            </div>
+          </div>
+          <div class="pt-5 mt-4 border-t border-panelBorder/70 flex items-center justify-between text-xs font-mono">
+            <a href="https://github.com/Hemesh1211/edr-sentinel" target="_blank" rel="noopener noreferrer" class="text-neonGreen hover:text-white flex items-center gap-1.5 transition">[↗] OPEN GITHUB REPOSITORY</a>
+            <span class="text-slate-500">ID: HP-EDR-09</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- PAGE 3: SKILLS -->
+    <section id="view-skills" class="page-view space-y-6">
+      <div class="flex flex-col md:flex-row md:items-end justify-between gap-2 border-b border-panelBorder pb-4">
+        <div>
+          <div class="text-xs font-mono text-cyberCyan tracking-widest">// SKILL & CAPABILITY MATRIX</div>
+          <h2 class="text-2xl sm:text-4xl font-bold text-white tracking-tight">Security & Engineering Arsenal</h2>
+        </div>
+        <div class="text-xs font-mono text-slate-400">ASSURANCE LEVEL: <span class="text-neonGreen">OPTIMAL // DEFENSIVE READINESS</span></div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="hud-box p-5 rounded-xl border border-panelBorder space-y-4 hover:border-cyberCyan/60 transition duration-300">
+          <div class="flex items-center justify-between text-xs font-mono">
+            <span class="text-cyberCyan font-bold">[MOD:01]</span>
+            <span class="text-slate-500">FIM & HOST SEC</span>
+          </div>
+          <h3 class="text-lg font-bold text-white">Host & File Integrity</h3>
+          <p class="text-xs text-slate-400 leading-relaxed">Real-time file hashing, tamper alerts, baseline filesystem state diffing, and automated payload quarantining.</p>
+          <div class="space-y-2 pt-2 text-xs font-mono">
+            <div>
+              <div class="flex justify-between text-slate-400 mb-1"><span>SHA-256 Checksums</span><span class="text-neonGreen">95%</span></div>
+              <div class="w-full bg-obsidian h-1.5 rounded"><div class="bg-neonGreen h-1.5 rounded" style="width: 95%"></div></div>
+            </div>
+            <div>
+              <div class="flex justify-between text-slate-400 mb-1"><span>Syscall Observation</span><span class="text-cyberCyan">88%</span></div>
+              <div class="w-full bg-obsidian h-1.5 rounded"><div class="bg-cyberCyan h-1.5 rounded" style="width: 88%"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="hud-box p-5 rounded-xl border border-panelBorder space-y-4 hover:border-neonGreen/60 transition duration-300">
+          <div class="flex items-center justify-between text-xs font-mono">
+            <span class="text-neonGreen font-bold">[MOD:02]</span>
+            <span class="text-slate-500">NET PROTOCOLS</span>
+          </div>
+          <h3 class="text-lg font-bold text-white">Network Packet Analysis</h3>
+          <p class="text-xs text-slate-400 leading-relaxed">Raw socket sniffing, TCP/UDP header dissection, Wireshark telemetry, and port scan defense mechanisms.</p>
+          <div class="space-y-2 pt-2 text-xs font-mono">
+            <div>
+              <div class="flex justify-between text-slate-400 mb-1"><span>Raw Sockets & Wireshark</span><span class="text-neonGreen">90%</span></div>
+              <div class="w-full bg-obsidian h-1.5 rounded"><div class="bg-neonGreen h-1.5 rounded" style="width: 90%"></div></div>
+            </div>
+            <div>
+              <div class="flex justify-between text-slate-400 mb-1"><span>Traffic Anomaly Detection</span><span class="text-cyberCyan">85%</span></div>
+              <div class="w-full bg-obsidian h-1.5 rounded"><div class="bg-cyberCyan h-1.5 rounded" style="width: 85%"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="hud-box p-5 rounded-xl border border-panelBorder space-y-4 hover:border-amberAlert/60 transition duration-300">
+          <div class="flex items-center justify-between text-xs font-mono">
+            <span class="text-amberAlert font-bold">[MOD:03]</span>
+            <span class="text-slate-500">DIGITAL LOGIC</span>
+          </div>
+          <h3 class="text-lg font-bold text-white">Circuit & Logic Synthesis</h3>
+          <p class="text-xs text-slate-400 leading-relaxed">Combinational & sequential circuit synthesis, priority encoders, decoders, multiplexers, and Boolean optimization.</p>
+          <div class="space-y-2 pt-2 text-xs font-mono">
+            <div>
+              <div class="flex justify-between text-slate-400 mb-1"><span>Gate Synthesis & K-Maps</span><span class="text-amberAlert">92%</span></div>
+              <div class="w-full bg-obsidian h-1.5 rounded"><div class="bg-amberAlert h-1.5 rounded" style="width: 92%"></div></div>
+            </div>
+            <div>
+              <div class="flex justify-between text-slate-400 mb-1"><span>Priority Encoders / Decoders</span><span class="text-cyberCyan">88%</span></div>
+              <div class="w-full bg-obsidian h-1.5 rounded"><div class="bg-cyberCyan h-1.5 rounded" style="width: 88%"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="hud-box p-5 rounded-xl border border-panelBorder space-y-4 hover:border-cyberCyan/60 transition duration-300">
+          <div class="flex items-center justify-between text-xs font-mono">
+            <span class="text-cyberCyan font-bold">[MOD:04]</span>
+            <span class="text-slate-500">AI & DEV AUTOMATION</span>
+          </div>
+          <h3 class="text-lg font-bold text-white">Languages & Automation</h3>
+          <p class="text-xs text-slate-400 leading-relaxed">Python, C/C++, Linux shell workflows, automated script orchestration, and CertX AI tools optimization.</p>
+          <div class="space-y-2 pt-2 text-xs font-mono">
+            <div>
+              <div class="flex justify-between text-slate-400 mb-1"><span>Python & C/C++ Systems</span><span class="text-neonGreen">90%</span></div>
+              <div class="w-full bg-obsidian h-1.5 rounded"><div class="bg-neonGreen h-1.5 rounded" style="width: 90%"></div></div>
+            </div>
+            <div>
+              <div class="flex justify-between text-slate-400 mb-1"><span>CertX AI Tools Workflow</span><span class="text-cyberCyan">96%</span></div>
+              <div class="w-full bg-obsidian h-1.5 rounded"><div class="bg-cyberCyan h-1.5 rounded" style="width: 96%"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hud-box p-5 rounded-xl border border-panelBorder space-y-3">
+        <div class="text-xs font-mono text-slate-400">// RAW CAPABILITY INVENTORY</div>
+        <div class="flex flex-wrap gap-2 text-xs font-mono">
+          <span class="px-3 py-1 rounded bg-panel border border-panelBorder text-slate-300">Python 3.x</span>
+          <span class="px-3 py-1 rounded bg-panel border border-panelBorder text-slate-300">C / Modern C++</span>
+          <span class="px-3 py-1 rounded bg-panel border border-panelBorder text-slate-300">SHA-256 Cryptographic Primitives</span>
+          <span class="px-3 py-1 rounded bg-panel border border-panelBorder text-slate-300">File Integrity Monitoring (FIM)</span>
+          <span class="px-3 py-1 rounded bg-panel border border-panelBorder text-slate-300">Raw Socket Telemetry</span>
+          <span class="px-3 py-1 rounded bg-panel border border-panelBorder text-slate-300">Packet Parsing & Wireshark</span>
+          <span class="px-3 py-1 rounded bg-panel border border-panelBorder text-slate-300">Digital Logic & Circuit Sim</span>
+          <span class="px-3 py-1 rounded bg-panel border border-panelBorder text-slate-300">Boolean Algebra & K-Maps</span>
+          <span class="px-3 py-1 rounded bg-panel border border-panelBorder text-slate-300">Linux / Bash Scripting</span>
+          <span class="px-3 py-1 rounded bg-panel border border-panelBorder text-slate-300">CertX AI Tools & Automation</span>
+          <span class="px-3 py-1 rounded bg-panel border border-panelBorder text-slate-300">AES-256 Enclave Ciphers</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAGE 4: ACADEMICS -->
+    <section id="view-academics" class="page-view space-y-6">
+      <div class="flex flex-col md:flex-row md:items-end justify-between gap-2 border-b border-panelBorder pb-4">
+        <div>
+          <div class="text-xs font-mono text-cyberCyan tracking-widest">// VERIFIED CHRONICLE</div>
+          <h2 class="text-2xl sm:text-4xl font-bold text-white tracking-tight">Academic Milestone & Credentials</h2>
+        </div>
+        <div class="text-xs font-mono text-slate-400">ENROLLMENT: <span class="text-neonGreen">SCSVMV B.E. CSE (2024–2028)</span></div>
+      </div>
+
+      <div class="space-y-4 font-mono text-xs">
+        <div class="hud-box p-5 rounded-xl border border-panelBorder hover:border-cyberCyan/60 transition">
+          <div class="flex flex-col gap-2 text-slate-400 pb-3 border-b border-panelBorder/60">
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span class="text-cyberCyan font-bold">[2024 - 2028]</span>
+              <span class="text-white font-sans text-base font-bold">Bachelor of Engineering (B.E.) — Computer Science & Engineering</span>
+            </div>
+            <a class="school-map-link" href="https://maps.app.goo.gl/DDs8evyHzDqrYvv59" target="_blank" rel="noopener noreferrer">SCSVMV UNIVERSITY <span aria-hidden="true">↗</span></a>
+          </div>
+          <div class="pt-3 text-slate-300 space-y-2 text-xs font-sans leading-relaxed">
+            <p>• Pursuing comprehensive foundational and advanced curriculum in Cyber Security Systems, Network Architecture, Operating System Internals, Data Structures & Algorithms, and Discrete Computation.</p>
+            <p>• Conducting practical lab research in cryptographic hashing invariants, host-based intrusion detection systems, and gate-level digital logic implementations.</p>
+          </div>
+          <div class="mt-3 pt-2 border-t border-panelBorder/50 flex flex-wrap gap-2 text-[11px] font-mono text-slate-400">
+            <span class="text-cyberCyan">TRACK:</span>
+            <span>Host Security</span> • <span>Networks</span> • <span>Operating Systems</span> • <span>Digital Circuits</span>
+          </div>
+        </div>
+
+        <div class="hud-box p-5 rounded-xl border border-panelBorder hover:border-amberAlert/60 transition">
+          <div class="flex flex-col gap-2 text-slate-400 pb-3 border-b border-panelBorder/60">
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span class="text-amberAlert font-bold">[INTERMEDIATE / +2]</span>
+              <span class="text-white font-sans text-base font-bold">Higher Secondary Education — Science (MPC)</span>
+            </div>
+            <a class="school-map-link" href="https://maps.app.goo.gl/NV3w7xqwULzvLoex7" target="_blank" rel="noopener noreferrer">SRI SAI JUNIOR COLLEGE <span aria-hidden="true">↗</span></a>
+          </div>
+          <div class="pt-3 text-slate-300 space-y-2 text-xs font-sans leading-relaxed">
+            <p>• Completed intermediate-level coursework in <strong class="text-white">Mathematics, Physics, and Chemistry (MPC)</strong>, building the analytical and quantitative foundation for engineering.</p>
+            <p>• Graduated with <strong class="text-amberAlert">80.8%</strong> aggregate — a consistent performer across all core subjects.</p>
+          </div>
+          <div class="mt-3 p-3 rounded bg-obsidian border border-panelBorder/80 font-mono text-[11px] flex items-center justify-between">
+            <span class="text-slate-500">// FINAL AGGREGATE RESULT</span>
+            <span class="text-amberAlert font-bold text-sm">80.8%</span>
+          </div>
+          <div class="mt-3 pt-2 border-t border-panelBorder/50 flex flex-wrap gap-2 text-[11px] font-mono text-slate-400">
+            <span class="text-amberAlert">SUBJECTS:</span>
+            <span>Mathematics</span> • <span>Physics</span> • <span>Chemistry</span> • <span>Computer Fundamentals</span>
+          </div>
+        </div>
+
+        <div class="hud-box p-5 rounded-xl border border-panelBorder hover:border-neonGreen/60 transition">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-slate-400 pb-2 border-b border-panelBorder/60">
+            <div class="flex items-center gap-2">
+              <span class="text-neonGreen font-bold">[COMPETITIVE EXAM]</span>
+              <span class="text-white font-sans text-base font-bold">JEE Mains — Engineering Entrance Qualification</span>
+            </div>
+            <div class="text-slate-500">AAKASH ACADEMY</div>
+          </div>
+          <div class="pt-3 text-slate-300 space-y-2 text-xs font-sans leading-relaxed">
+            <p>• Trained intensively at <strong class="text-white">Aakash Academy</strong> for India's premier engineering entrance examination (JEE Mains), mastering advanced problem-solving in Physics, Chemistry, and Mathematics.</p>
+            <p>• Secured <strong class="text-neonGreen">91.963 percentile</strong> in JEE Mains — placing among the top-tier national candidates and earning engineering admission eligibility.</p>
+          </div>
+          <div class="mt-3 p-3 rounded bg-obsidian border border-panelBorder/80 font-mono text-[11px] flex items-center justify-between">
+            <span class="text-slate-500">// JEE MAINS PERCENTILE</span>
+            <span class="text-neonGreen font-bold text-sm">91.963 %ile</span>
+          </div>
+          <div class="mt-3 pt-2 border-t border-panelBorder/50 flex flex-wrap gap-2 text-[11px] font-mono text-slate-400">
+            <span class="text-neonGreen">DOMAINS:</span>
+            <span>Advanced Mathematics</span> • <span>Physics</span> • <span>Chemistry</span> • <span>Time-Bound Problem Solving</span>
+          </div>
+        </div>
+
+        <div class="hud-box p-5 rounded-xl border border-panelBorder hover:border-neonGreen/60 transition">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-slate-400 pb-2 border-b border-panelBorder/60">
+            <div class="flex items-center gap-2">
+              <span class="text-neonGreen font-bold">[VERIFIED CERTIFICATION]</span>
+              <span class="text-white font-sans text-base font-bold">CertX — AI Tools & Automation Certification</span>
+            </div>
+            <div class="text-slate-500">ID: CERTX-AI-AUTO</div>
+          </div>
+          <div class="pt-3 text-slate-300 space-y-2 text-xs font-sans leading-relaxed">
+            <p>• Demonstrated verified competence in leveraging modern artificial intelligence tools, workflow pipeline automation, and automated code analysis for cybersecurity threat modeling.</p>
+            <p>• Built scripted automation pipelines to reduce manual validation time during code audit and security log reviews.</p>
+          </div>
+          <div class="mt-3 pt-2 border-t border-panelBorder/50 flex flex-wrap gap-2 text-[11px] font-mono text-slate-400">
+            <span class="text-neonGreen">SKILLS VALIDATED:</span>
+            <span>AI Workflow Orchestration</span> • <span>Prompt Automation</span> • <span>Telemetry Scripting</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- PAGE 5: PLAY -->
+    <section id="view-play" class="page-view space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-2 border-b border-panelBorder pb-4">
+        <div>
+          <div class="text-xs font-mono text-cyberCyan tracking-widest">// SECURITY AWARENESS MINI-GAME</div>
+          <h2 class="text-2xl sm:text-4xl font-bold text-white tracking-tight">Play: Password Fort Builder</h2>
+        </div>
+        <div class="text-xs font-mono text-slate-400">SIMULATION: <span class="text-neonGreen">LOCAL / FICTIONAL</span></div>
+      </div>
+
+      <div class="hud-box p-5 sm:p-8 rounded-xl border border-panelBorder space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-5 border-b border-panelBorder/70">
+          <div>
+            <h3 class="text-lg sm:text-xl font-semibold text-white">Strengthen the demo account</h3>
+            <p class="text-sm text-slate-400 mt-1">Choose safer habits to add protective layers to this fictional login.</p>
+            <label for="fort-demo-password" class="block mt-4 text-sm font-mono text-cyberCyan">Enter a fictional demo password</label>
+            <input id="fort-demo-password" type="text" autocomplete="off" spellcheck="false" placeholder="Type a made-up password" aria-describedby="fort-password-note" class="mt-2 w-full max-w-md px-3 py-2 rounded bg-obsidian border border-cyberCyan/50 text-amber-200 font-mono tracking-wider placeholder:text-slate-500 focus:outline-none focus:border-cyberCyan focus:ring-2 focus:ring-cyberCyan/30">
+            <p id="fort-password-note" class="text-sm text-amber-200 mt-2">Demo only: enter a made-up password. Never type a real password here.</p>
+          </div>
+          <div class="text-xs font-mono uppercase tracking-widest text-amberAlert" id="fort-status" aria-live="polite">Fort layers: 0 / 4</div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" role="group" aria-label="Choose password safety improvements">
+          <button class="fort-upgrade text-left p-4 rounded-lg bg-panel border border-panelBorder hover:border-cyberCyan/70 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-amberAlert" type="button" aria-pressed="false" data-upgrade="length"><span class="block text-white font-semibold text-sm">Generate a longer password</span><span class="block text-slate-400 text-xs mt-1">Replace the short sample with a longer randomized demo password.</span><span class="fort-state block mt-3 text-[10px] font-mono uppercase tracking-widest text-amberAlert">Add layer +</span></button>
+          <button class="fort-upgrade text-left p-4 rounded-lg bg-panel border border-panelBorder hover:border-cyberCyan/70 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-amberAlert" type="button" aria-pressed="false" data-upgrade="patterns"><span class="block text-white font-semibold text-sm">Avoid obvious patterns</span><span class="block text-slate-400 text-xs mt-1">Skip common words, predictable sequences, and personal details.</span><span class="fort-state block mt-3 text-[10px] font-mono uppercase tracking-widest text-amberAlert">Add layer +</span></button>
+          <button class="fort-upgrade text-left p-4 rounded-lg bg-panel border border-panelBorder hover:border-cyberCyan/70 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-amberAlert" type="button" aria-pressed="false" data-upgrade="unique"><span class="block text-white font-semibold text-sm">Make it unique</span><span class="block text-slate-400 text-xs mt-1">Use a different password for every account; a password manager can help.</span><span class="fort-state block mt-3 text-[10px] font-mono uppercase tracking-widest text-amberAlert">Add layer +</span></button>
+          <button class="fort-upgrade text-left p-4 rounded-lg bg-panel border border-panelBorder hover:border-cyberCyan/70 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-amberAlert" type="button" aria-pressed="false" data-upgrade="mfa"><span class="block text-white font-semibold text-sm">Add multi-factor authentication</span><span class="block text-slate-400 text-xs mt-1">Turn on another verification step beyond the password.</span><span class="fort-state block mt-3 text-[10px] font-mono uppercase tracking-widest text-amberAlert">Add layer +</span></button>
+        </div>
+
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-panelBorder/70 pt-4">
+          <p id="fort-feedback" class="text-sm text-slate-300" aria-live="polite">Choose an upgrade to strengthen the demo account.</p>
+          <button id="fort-reset" type="button" class="shrink-0 px-4 py-2 rounded border border-amberAlert/80 bg-amberAlert/15 text-sm font-mono font-bold tracking-wider text-amber-200 shadow-[0_0_14px_rgba(245,158,11,0.18)] hover:bg-amberAlert/30 hover:text-white hover:shadow-[0_0_20px_rgba(245,158,11,0.35)] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyberCyan">↻ RESET GAME</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAGE 6: TERMINAL -->
+    <section id="view-terminal" class="page-view space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-panelBorder pb-3 text-xs font-mono">
+        <div class="flex items-center gap-2 text-slate-400">
+          <span class="text-neonGreen font-bold">FULLSCREEN HUD CLI</span>
+          <span class="text-slate-600">// Pujari Hemesh Shell v4.0</span>
+        </div>
+        <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
+          <span class="text-slate-500 mr-1">RUN:</span>
+          <button class="cmd-chip px-2 py-0.5 rounded bg-panel border border-panelBorder hover:border-cyberCyan text-slate-300 font-mono hover:text-cyberCyan transition" data-cmd="help">help</button>
+          <button class="cmd-chip px-2 py-0.5 rounded bg-panel border border-panelBorder hover:border-cyberCyan text-slate-300 font-mono hover:text-cyberCyan transition" data-cmd="whoami">whoami</button>
+          <button class="cmd-chip px-2 py-0.5 rounded bg-panel border border-panelBorder hover:border-cyberCyan text-slate-300 font-mono hover:text-cyberCyan transition" data-cmd="projects">projects</button>
+          <button class="cmd-chip px-2 py-0.5 rounded bg-panel border border-panelBorder hover:border-cyberCyan text-slate-300 font-mono hover:text-cyberCyan transition" data-cmd="skills">skills</button>
+          <button class="cmd-chip px-2 py-0.5 rounded bg-panel border border-panelBorder hover:border-cyberCyan text-slate-300 font-mono hover:text-cyberCyan transition" data-cmd="education">education</button>
+          <button class="cmd-chip px-2 py-0.5 rounded bg-panel border border-panelBorder hover:border-cyberCyan text-slate-300 font-mono hover:text-cyberCyan transition" data-cmd="linkedin">linkedin</button>
+          <button class="cmd-chip px-2 py-0.5 rounded bg-panel border border-panelBorder hover:border-cyberCyan text-slate-300 font-mono hover:text-cyberCyan transition" data-cmd="email">email</button>
+          <button class="cmd-chip px-2 py-0.5 rounded bg-panel border border-panelBorder hover:border-cyberCyan text-slate-300 font-mono hover:text-cyberCyan transition" data-cmd="clear">clear</button>
+        </div>
+      </div>
+
+      <div class="hud-box p-4 sm:p-6 rounded-xl border border-panelBorder space-y-3">
+        <div id="terminal-scroll-area" class="font-mono text-xs sm:text-sm text-slate-300 space-y-2 min-h-[360px] max-h-[500px] overflow-y-auto leading-relaxed">
+          <div class="text-slate-500">
+            [+] Terminal authenticated for operator: hemesh@pujari-cyber-defense:~<br/>
+            [+] Type <span class="text-cyberCyan font-bold">'help'</span> for instructions, or enter <span class="text-neonGreen font-bold">'goto &lt;page&gt;'</span> (e.g., 'goto projects') to trigger smooth HUD traction navigation.
+          </div>
+        </div>
+
+        <form id="terminal-form" class="flex items-center gap-2 pt-2 border-t border-panelBorder/70 font-mono text-sm">
+          <span class="text-neonGreen font-bold select-none">&gt;</span>
+          <input id="terminal-input" type="text" autocomplete="off" 
+            placeholder="enter directive (e.g. 'help', 'whoami', 'skills', 'goto projects', 'linkedin', 'email', 'clear')..." 
+            class="w-full bg-transparent text-neonGreen placeholder-slate-600 focus:outline-none text-xs sm:text-sm" />
+          <button type="submit" class="px-4 py-1.5 bg-panel border border-panelBorder text-slate-300 hover:text-cyberCyan rounded text-xs transition">EXEC</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- PAGE 7: CONTACT -->
+    <section id="view-contact" class="page-view space-y-6">
+      <div class="flex flex-col md:flex-row md:items-end justify-between gap-2 border-b border-panelBorder pb-4">
+        <div>
+          <div class="text-xs font-mono text-cyberCyan tracking-widest">// SECURE TRANSMISSION UPLINK</div>
+          <h2 class="text-2xl sm:text-4xl font-bold text-white tracking-tight">Initiate Transmission with Hemesh</h2>
+        </div>
+        <div class="text-xs font-mono text-slate-400">UPLINK STATUS: <span class="text-neonGreen">READY FOR TRANSMISSION</span></div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div class="lg:col-span-7 hud-box p-6 rounded-xl border border-panelBorder space-y-4">
+          <div class="text-xs font-mono text-slate-400 pb-2 border-b border-panelBorder/70 flex items-center justify-between">
+            <span>PACKET TRANSMISSION TERMINAL</span>
+            <span class="text-neonGreen">CHANNEL: SECURE</span>
+          </div>
+
+          <form id="contact-dispatch-form" class="space-y-4 text-xs font-mono">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-slate-400 mb-1.5">// CALLSIGN / SENDER NAME</label>
+                <input type="text" id="form-name" required placeholder="e.g. Cybersecurity Recruiter / Team Lead" 
+                  class="w-full bg-obsidian border border-panelBorder rounded p-2.5 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyberCyan transition" />
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1.5">// RETURN NODE / EMAIL</label>
+                <input type="email" id="form-email" required placeholder="operator@organization.com" 
+                  class="w-full bg-obsidian border border-panelBorder rounded p-2.5 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyberCyan transition" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-slate-400 mb-1.5">// SUBJECT / INQUIRY TOPIC</label>
+              <input type="text" id="form-subject" required placeholder="Cyber Security Internship / Research Project" 
+                class="w-full bg-obsidian border border-panelBorder rounded p-2.5 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-neonGreen transition" />
+            </div>
+
+            <div>
+              <label class="block text-slate-400 mb-1.5">// ENCRYPTED PAYLOAD / MESSAGE</label>
+              <textarea rows="4" id="form-message" required placeholder="Include project scope, tech stack requirements, or collaboration proposal..." 
+                class="w-full bg-obsidian border border-panelBorder rounded p-2.5 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyberCyan transition font-mono text-xs"></textarea>
+            </div>
+
+            <div id="form-transmission-result" class="hidden p-3 rounded text-xs font-mono"></div>
+
+            <button type="submit" id="form-dispatch-btn"
+              class="w-full py-3 rounded bg-cyberCyan hover:bg-cyan-300 text-obsidian font-bold tracking-wider font-mono transition shadow-cyan-glow flex items-center justify-center gap-2">
+              <span>TRANSMIT PACKET PAYLOAD</span><span>&rarr;</span>
+            </button>
+          </form>
+        </div>
+
+        <div class="lg:col-span-5 space-y-4">
+          <div class="hud-box p-5 rounded-xl border border-panelBorder space-y-3 font-mono text-xs">
+            <div class="flex items-center justify-between text-slate-400 border-b border-panelBorder pb-2">
+              <span class="text-cyberCyan font-bold">PRIMARY NETWORK UPLINK</span>
+              <span class="text-neonGreen">VERIFIED</span>
+            </div>
+            <p class="text-slate-300 text-xs font-sans leading-relaxed">
+              Connect directly on LinkedIn or dispatch an encrypted email for professional recruitment, internship inquiries, and technical discussion in Cyber Defense.
+            </p>
+
+            <!-- LinkedIn Uplink -->
+            <a href="https://www.linkedin.com/in/pujarihemesh12?utm_source=share_via&utm_content=profile&utm_medium=member_android" 
+              target="_blank" rel="noreferrer"
+              class="w-full py-3 bg-panel hover:bg-panelBorder text-cyberCyan border border-cyberCyan/50 rounded transition flex items-center justify-center gap-2 font-mono text-xs font-semibold shadow-cyan-glow">
+              <span>OPEN LINKEDIN PROFILE [↗]</span>
+            </a>
+
+            <!-- Gmail Uplink -->
+            <a href="mailto:pujarihemesh26@gmail.com"
+              class="w-full py-3 bg-panel hover:bg-panelBorder text-neonGreen border border-neonGreen/50 rounded transition flex items-center justify-center gap-2 font-mono text-xs font-semibold shadow-green-glow">
+              <span>✉ SEND EMAIL UPLINK [→]</span>
+            </a>
+
+            <div class="text-[13px] break-all pt-2 space-y-1.5">
+              <div class="rounded bg-cyberCyan/10 border border-cyberCyan/50 px-2 py-1.5 text-cyan-100 shadow-cyan-glow">LINKEDIN: https://www.linkedin.com/in/pujarihemesh12</div>
+              <div class="rounded bg-neonGreen/10 border border-neonGreen/50 px-2 py-1.5 text-emerald-100 shadow-green-glow">EMAIL: <span class="text-neonGreen">pujarihemesh26@gmail.com</span></div>
+            </div>
+          </div>
+
+          <div class="hud-box p-5 rounded-xl border border-panelBorder font-mono text-xs space-y-2.5 text-slate-400">
+            <div class="text-slate-300 font-bold mb-1">// SYSTEM METADATA</div>
+            <div class="flex justify-between py-1 border-b border-panelBorder/60"><span>OPERATOR:</span><span class="text-slate-200">Hemesh Pujari</span></div>
+            <div class="flex justify-between py-1 border-b border-panelBorder/60"><span>ACADEMIC NODE:</span><span class="text-slate-200">SCSVMV University</span></div>
+            <div class="flex justify-between py-1 border-b border-panelBorder/60"><span>BATCH:</span><span class="text-cyberCyan">2024 – 2028</span></div>
+            <div class="flex justify-between py-1 border-b border-panelBorder/60">
+              <span>EMAIL:</span>
+              <a href="mailto:pujarihemesh26@gmail.com" class="text-neonGreen hover:text-white transition">pujarihemesh26@gmail.com</a>
+            </div>
+            <div class="flex justify-between py-1 border-b border-panelBorder/60">
+              <span>GITHUB:</span><a href="https://github.com/Hemesh1211" target="_blank" class="text-white hover:text-cyberCyan transition">github.com/Hemesh1211</a>
+            </div>
+            <div class="flex justify-between py-1"><span>AVAILABILITY:</span><span class="text-neonGreen">OPEN FOR CYBER INTERNSHIPS</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <nav aria-label="Main section navigation" class="fixed bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] left-2 right-2 z-40 bg-obsidian/95 backdrop-blur-lg border border-panelBorder/90 rounded-xl px-2 py-2 shadow-2xl flex items-center gap-1 overflow-x-auto text-[10px] font-mono sm:bottom-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-max sm:rounded-full sm:px-3 sm:py-1.5 sm:gap-1 sm:text-xs">
+    <button aria-current="page" onclick="navigateToPage('home')" data-dock-id="home" class="dock-btn min-w-[3.25rem] px-2 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex flex-col items-center justify-center gap-0.5 sm:min-w-0 sm:flex-row sm:gap-1.5 sm:rounded-full sm:px-3" title="Hub (Press 1)"><span aria-hidden="true">◈</span><span>HOME</span></button>
+    <button onclick="navigateToPage('projects')" data-dock-id="projects" class="dock-btn min-w-[3.25rem] px-2 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex flex-col items-center justify-center gap-0.5 sm:min-w-0 sm:flex-row sm:gap-1.5 sm:rounded-full sm:px-3" title="Projects (Press 2)"><span aria-hidden="true">⚡</span><span>PROJECTS</span></button>
+    <button onclick="navigateToPage('academics')" data-dock-id="academics" class="dock-btn min-w-[3.25rem] px-2 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex flex-col items-center justify-center gap-0.5 sm:min-w-0 sm:flex-row sm:gap-1.5 sm:rounded-full sm:px-3" title="Academics (Press 3)"><span aria-hidden="true">🎓</span><span>STUDY</span></button>
+    <button onclick="navigateToPage('play')" data-dock-id="play" class="dock-btn min-w-[3.25rem] px-2 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex flex-col items-center justify-center gap-0.5 sm:min-w-0 sm:flex-row sm:gap-1.5 sm:rounded-full sm:px-3" title="Play (Press 4)"><span aria-hidden="true">🎮</span><span>PLAY</span></button>
+    <button onclick="navigateToPage('terminal')" data-dock-id="terminal" class="dock-btn min-w-[3.25rem] px-2 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex flex-col items-center justify-center gap-0.5 sm:min-w-0 sm:flex-row sm:gap-1.5 sm:rounded-full sm:px-3" title="Terminal (Press 5)"><span aria-hidden="true">&gt;_</span><span>TERMINAL</span></button>
+    <button onclick="navigateToPage('contact')" data-dock-id="contact" class="dock-btn min-w-[3.25rem] px-2 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex flex-col items-center justify-center gap-0.5 sm:min-w-0 sm:flex-row sm:gap-1.5 sm:rounded-full sm:px-3" title="Contact (Press 6)"><span aria-hidden="true">📡</span><span>CONTACT</span></button>
+  </nav>
+
+  <script>
+    // AUDIO SYNTH
+    let audioContext = null;
+    let sfxEnabled = true;
+    let ambientHumEnabled = false;
+    let ambientOsc = null, ambientGain = null;
+
+    function getAudioCtx() { if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)(); return audioContext; }
+
+    function startAmbientHum() {
+      const ctx = getAudioCtx();
+      if (ambientOsc) return;
+
+      ambientOsc = ctx.createOscillator();
+      ambientGain = ctx.createGain();
+
+      ambientOsc.type = 'sine';
+      ambientOsc.frequency.setValueAtTime(60, ctx.currentTime); // Deep 60Hz hum
+      ambientGain.gain.setValueAtTime(0, ctx.currentTime);
+      ambientGain.gain.linearRampToValueAtTime(0.015, ctx.currentTime + 2);
+
+      ambientOsc.connect(ambientGain);
+      ambientGain.connect(ctx.destination);
+      ambientOsc.start();
+    }
+
+    function stopAmbientHum() {
+      if (ambientGain) {
+        ambientGain.gain.linearRampToValueAtTime(0, audioContext.currentTime + 1);
+        setTimeout(() => {
+          if (ambientOsc) {
+            ambientOsc.stop();
+            ambientOsc = null;
+            ambientGain = null;
+          }
+        }, 1000);
+      }
+    }
+
+    function playTone(freq, type = 'sine', duration = 0.05, gainVal = 0.03) {
+      if (!sfxEnabled) return;
+      try {
+        const ctx = getAudioCtx();
+        if (ctx.state === 'suspended') ctx.resume();
+        const osc = ctx.createOscillator(), amp = ctx.createGain();
+        osc.type = type; osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        amp.gain.setValueAtTime(gainVal, ctx.currentTime);
+        amp.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
+        osc.connect(amp); amp.connect(ctx.destination);
+        osc.start(); osc.stop(ctx.currentTime + duration);
+      } catch (e) {}
+    }
+    const sndClick = () => playTone(950, 'triangle', 0.035, 0.02);
+    const sndTractionSweep = () => {
+      if (!sfxEnabled) return;
+      try {
+        const ctx = getAudioCtx(); if (ctx.state === 'suspended') ctx.resume();
+        const osc = ctx.createOscillator(), amp = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(320, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1100, ctx.currentTime + 0.22);
+        amp.gain.setValueAtTime(0.02, ctx.currentTime);
+        amp.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.22);
+        osc.connect(amp); amp.connect(ctx.destination);
+        osc.start(); osc.stop(ctx.currentTime + 0.22);
+      } catch(e) {}
+    };
+    const sndSuccess = () => { playTone(550, 'sine', 0.05, 0.025); setTimeout(() => playTone(1050, 'sine', 0.08, 0.025), 50); };
+    const sndAlert = () => playTone(300, 'sawtooth', 0.1, 0.035);
+
+    document.addEventListener('click', (e) => { if (e.target.closest('button') || e.target.closest('a')) sndClick(); });
+
+    const sfxBtn = document.getElementById('sfx-toggle-btn');
+    const sfxStatus = document.getElementById('sfx-status');
+    const sfxIcon = document.getElementById('sfx-icon');
+    sfxBtn.addEventListener('click', () => {
+      sfxEnabled = !sfxEnabled;
+      sfxStatus.textContent = sfxEnabled ? 'ON' : 'OFF';
+      sfxIcon.textContent = sfxEnabled ? '🔊' : '🔇';
+
+      // Toggle Ambient Hum along with SFX for simplicity, or it could be a separate button
+      if (sfxEnabled) {
+        sndSuccess();
+        startAmbientHum();
+      } else {
+        stopAmbientHum();
+      }
+    });
+
+    const scanlineBtn = document.getElementById('scanline-toggle-btn');
+    const scanlineLayer = document.getElementById('scanline-layer');
+    const scanlineStatus = document.getElementById('scanline-status');
+    let scanlineActive = true;
+    scanlineBtn.addEventListener('click', () => {
+      scanlineActive = !scanlineActive;
+      scanlineLayer.style.opacity = scanlineActive ? '1' : '0';
+      scanlineStatus.textContent = scanlineActive ? 'ON' : 'OFF';
+      document.body.style.fontFamily = scanlineActive ? 'Arial, sans-serif' : 'Space Grotesk, sans-serif';
+    });
+
+    // SPA ROUTER
+    const pages = {
+      home: { title: 'HUB', el: document.getElementById('view-home') },
+      projects: { title: 'PROJECTS', el: document.getElementById('view-projects') },
+      skills: { title: 'ARSENAL', el: document.getElementById('view-skills') },
+      academics: { title: 'ACADEMICS', el: document.getElementById('view-academics') },
+      play: { title: 'PLAY', el: document.getElementById('view-play') },
+      terminal: { title: 'TERMINAL', el: document.getElementById('view-terminal') },
+      contact: { title: 'DISPATCH', el: document.getElementById('view-contact') }
+    };
+    let currentPageId = 'home';
+    const warpScreen = document.getElementById('warp-screen');
+    const hudBreadcrumb = document.getElementById('hud-breadcrumb');
+
+    function updateActiveNavUI(targetId) {
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        const id = btn.getAttribute('data-nav-id');
+        if (id === targetId) btn.className = "nav-btn px-3 py-1.5 rounded transition text-cyberCyan font-bold bg-panel border border-cyberCyan/50";
+        else btn.className = "nav-btn px-3 py-1.5 rounded transition text-slate-300 hover:text-white hover:bg-panel border border-transparent";
+      });
+      document.querySelectorAll('.dock-btn').forEach(btn => {
+        const id = btn.getAttribute('data-dock-id');
+        const active = id === targetId;
+        btn.setAttribute('aria-current', active ? 'page' : 'false');
+        btn.className = active
+          ? "dock-btn min-w-[3.25rem] px-2 py-1.5 rounded-lg text-cyberCyan font-bold bg-panel border border-cyberCyan/60 shadow-cyan-glow transition flex flex-col items-center justify-center gap-0.5 sm:min-w-0 sm:flex-row sm:gap-1.5 sm:rounded-full sm:px-3"
+          : "dock-btn min-w-[3.25rem] px-2 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex flex-col items-center justify-center gap-0.5 sm:min-w-0 sm:flex-row sm:gap-1.5 sm:rounded-full sm:px-3";
+      });
+      hudBreadcrumb.textContent = pages[targetId].title;
+    }
+
+    function navigateToPage(targetId, withAudio = true) {
+      if (!pages[targetId] || targetId === currentPageId) return;
+      if (withAudio) sndTractionSweep();
+
+      // Trigger Glitch Effect
+      document.body.classList.add('glitch-active');
+      setTimeout(() => document.body.classList.remove('glitch-active'), 300);
+
+      warpScreen.classList.add('warp-active');
+      const bar = document.getElementById('warp-bar');
+      bar.style.animation = 'none'; void bar.offsetWidth;
+      bar.style.animation = 'sweepRadar 0.32s linear forwards';
+      setTimeout(() => {
+        pages[currentPageId].el.classList.remove('active-page');
+        pages[targetId].el.classList.add('active-page');
+        currentPageId = targetId;
+        updateActiveNavUI(targetId);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        if (targetId === 'home') setTimeout(onThreeResize, 50);
+        if (targetId === 'terminal') { const cliInp = document.getElementById('terminal-input'); if (cliInp) cliInp.focus(); }
+        setTimeout(() => warpScreen.classList.remove('warp-active'), 150);
+      }, 160);
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      const keyMap = { '1': 'home', '2': 'projects', '3': 'academics', '4': 'play', '5': 'terminal', '6': 'contact' };
+      if (keyMap[e.key]) navigateToPage(keyMap[e.key]);
+    });
+
+    updateActiveNavUI('home');
+
+    // Change the highlighted intermediate score color on each page load.
+    const intermediateScore = document.getElementById('intermediate-score');
+    if (intermediateScore) {
+      const scoreColors = ['#f59e0b', '#06b6d4', '#10b981', '#f43f5e', '#a78bfa', '#f97316'];
+      let previousScoreColor = null;
+      try { previousScoreColor = localStorage.getItem('home-score-color'); } catch (e) {}
+      const availableScoreColors = scoreColors.filter(color => color !== previousScoreColor);
+      const nextScoreColor = availableScoreColors[Math.floor(Math.random() * availableScoreColors.length)];
+      intermediateScore.style.color = nextScoreColor;
+      intermediateScore.style.textShadow = `0 0 10px ${nextScoreColor}88`;
+      try { localStorage.setItem('home-score-color', nextScoreColor); } catch (e) {}
+    }
+
+    // CLOCK
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('hud-clock').textContent = now.toUTCString().split(' ')[4] + ' UTC';
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // TYPEWRITER
+    const heroTypewriter = document.getElementById('typewriter-hero');
+    const heroTaglines = [
+      "Cybersecurity Specialist",
+      "B.E. CSE Scholar (2024–2028)",
+      "File Integrity Monitoring (FIM) Architect",
+      "Network Packet Sentinel Developer",
+      "CertX AI & Automation Certified"
+    ];
+    let tagIdx = 0, charIdx = 0, isDeleting = false;
+    function runHeroTypewriter() {
+      const current = heroTaglines[tagIdx];
+      if (isDeleting) { heroTypewriter.textContent = current.substring(0, charIdx - 1); charIdx--; }
+      else { heroTypewriter.textContent = current.substring(0, charIdx + 1); charIdx++; }
+      let speed = isDeleting ? 25 : 55;
+      if (!isDeleting && charIdx === current.length) { speed = 2200; isDeleting = true; }
+      else if (isDeleting && charIdx === 0) { isDeleting = false; tagIdx = (tagIdx + 1) % heroTaglines.length; speed = 400; }
+      setTimeout(runHeroTypewriter, speed);
+    }
+    runHeroTypewriter();
+
+    // THREE.JS
+    let threeScene, threeCamera, threeRenderer;
+    let shieldMesh, innerCoreMesh, ringMesh, particleSystem;
+    let targetRotY = 0, targetRotX = 0;
+    let isDragging = false, lastMouseX = 0, lastMouseY = 0;
+
+    function initThreeJS() {
+      const mount = document.getElementById('three-core-viewport');
+      const loader = document.getElementById('three-loading-state');
+      if (!mount) return;
+      const width = mount.clientWidth, height = mount.clientHeight;
+      threeScene = new THREE.Scene();
+      threeCamera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+      threeCamera.position.z = 4.2;
+      threeRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      threeRenderer.setSize(width, height);
+      threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      mount.appendChild(threeRenderer.domElement);
+      if (loader) loader.style.display = 'none';
+
+      const octGeo = new THREE.OctahedronGeometry(1.4, 1);
+      const octMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4, wireframe: true, transparent: true, opacity: 0.75 });
+      shieldMesh = new THREE.Mesh(octGeo, octMat);
+      threeScene.add(shieldMesh);
+
+      const coreGeo = new THREE.IcosahedronGeometry(0.7, 0);
+      const coreMat = new THREE.MeshBasicMaterial({ color: 0x10b981, wireframe: false, transparent: true, opacity: 0.22 });
+      innerCoreMesh = new THREE.Mesh(coreGeo, coreMat);
+      threeScene.add(innerCoreMesh);
+
+      const ringGeo = new THREE.TorusGeometry(1.85, 0.015, 8, 48);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.45 });
+      ringMesh = new THREE.Mesh(ringGeo, ringMat);
+      ringMesh.rotation.x = Math.PI / 2.5;
+      threeScene.add(ringMesh);
+
+      const pCount = 280;
+      const pGeo = new THREE.BufferGeometry();
+      const positions = new Float32Array(pCount * 3);
+      for (let i = 0; i < pCount; i++) {
+        const radius = 1.9 + Math.random() * 0.9;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos((Math.random() * 2) - 1);
+        positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+        positions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+        positions[i * 3 + 2] = radius * Math.cos(phi);
+      }
+      pGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      const pMat = new THREE.PointsMaterial({ color: 0x10b981, size: 0.035, transparent: true, opacity: 0.85 });
+      particleSystem = new THREE.Points(pGeo, pMat);
+      threeScene.add(particleSystem);
+
+      mount.addEventListener('mousedown', (e) => { isDragging = true; lastMouseX = e.clientX; lastMouseY = e.clientY; });
+      window.addEventListener('mouseup', () => { isDragging = false; });
+      mount.addEventListener('mousemove', (e) => {
+        if (isDragging) {
+          const deltaX = e.clientX - lastMouseX, deltaY = e.clientY - lastMouseY;
+          targetRotY += deltaX * 0.009; targetRotX += deltaY * 0.009;
+          lastMouseX = e.clientX; lastMouseY = e.clientY;
+        }
+      });
+      mount.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) { isDragging = true; lastMouseX = e.touches[0].clientX; lastMouseY = e.touches[0].clientY; }
+      }, { passive: true });
+      mount.addEventListener('touchmove', (e) => {
+        if (isDragging && e.touches.length === 1) {
+          const deltaX = e.touches[0].clientX - lastMouseX, deltaY = e.touches[0].clientY - lastMouseY;
+          targetRotY += deltaX * 0.01; targetRotX += deltaY * 0.01;
+          lastMouseX = e.touches[0].clientX; lastMouseY = e.touches[0].clientY;
+        }
+      }, { passive: true });
+      window.addEventListener('touchend', () => { isDragging = false; });
+      window.addEventListener('resize', onThreeResize);
+    }
+
+    function onThreeResize() {
+      const mount = document.getElementById('three-core-viewport');
+      if (!mount || !threeRenderer || !threeCamera) return;
+      threeCamera.aspect = mount.clientWidth / mount.clientHeight;
+      threeCamera.updateProjectionMatrix();
+      threeRenderer.setSize(mount.clientWidth, mount.clientHeight);
+    }
+
+    function animateThreeJS() {
+      requestAnimationFrame(animateThreeJS);
+      if (shieldMesh && innerCoreMesh && particleSystem && ringMesh) {
+        targetRotY += 0.004;
+        shieldMesh.rotation.y += (targetRotY - shieldMesh.rotation.y) * 0.06;
+        shieldMesh.rotation.x += (targetRotX - shieldMesh.rotation.x) * 0.06;
+        innerCoreMesh.rotation.y = -shieldMesh.rotation.y * 1.5;
+        innerCoreMesh.rotation.x = shieldMesh.rotation.x * 1.5;
+        ringMesh.rotation.z += 0.005;
+        particleSystem.rotation.y -= 0.0015;
+        const deg = ((shieldMesh.rotation.y * 180 / Math.PI) % 360).toFixed(1);
+        const rotEl = document.getElementById('telemetry-euler');
+        if (rotEl) rotEl.textContent = `${deg}°`;
+      }
+      if (threeRenderer && threeScene && threeCamera) threeRenderer.render(threeScene, threeCamera);
+    }
+
+    window.addEventListener('load', () => { initThreeJS(); animateThreeJS(); });
+
+    // TERMINAL
+    const termBuffer = document.getElementById('terminal-scroll-area');
+    const termInput = document.getElementById('terminal-input');
+    const termForm = document.getElementById('terminal-form');
+
+    const commands = {
+      help: () => `
+  <div class="text-cyberCyan font-bold">AUTHORIZED REPL DIRECTIVES:</div>
+  <div>- <span class="text-neonGreen font-bold">whoami</span>       : Operator identity, clearance, institution</div>
+  <div>- <span class="text-neonGreen font-bold">projects</span>     : Show engineered defense projects</div>
+  <div>- <span class="text-neonGreen font-bold">skills</span>       : Enumerate security, coding & automation arsenal</div>
+  <div>- <span class="text-neonGreen font-bold">education</span>    : Full academic chain (B.E. / Intermediate / JEE)</div>
+  <div>- <span class="text-neonGreen font-bold">certx</span>        : CertX AI Tools & Automation verification</div>
+  <div>- <span class="text-neonGreen font-bold">goto &lt;page&gt;</span> : Navigate with smooth HUD traction (e.g. 'goto projects', 'goto play', 'goto contact')</div>
+  <div>- <span class="text-neonGreen font-bold">linkedin</span>     : Open verified LinkedIn profile</div>
+  <div>- <span class="text-neonGreen font-bold">email</span>        : Open Gmail compose to pujarihemesh26@gmail.com</div>
+  <div>- <span class="text-neonGreen font-bold">ping</span>         : Measure gateway network latency</div>
+  <div>- <span class="text-neonGreen font-bold">clear</span>        : Flush terminal buffer</div>`,
+
+      whoami: () => `
+  <div>OPERATOR   : <span class="text-white font-bold">Hemesh Pujari (Pujari Hemesh)</span></div>
+  <div>PROGRAM    : B.E. Computer Science & Engineering (2024 - 2028)</div>
+  <div>UNIVERSITY : Sri Chandrasekharendra Saraswathi Viswa Mahavidyalaya (SCSVMV)</div>
+  <div>SPECIALTY  : File Integrity Monitoring (FIM), Packet Telemetry, Digital Logic</div>
+  <div>PRIOR EDU  : Sri Sai Junior College — MPC — <span class="text-amberAlert font-bold">80.8%</span></div>
+  <div>JEE MAINS  : Aakash Academy — <span class="text-neonGreen font-bold">91.963 %ile</span></div>
+  <div>EMAIL      : <a href="mailto:pujarihemesh26@gmail.com" class="text-neonGreen underline">pujarihemesh26@gmail.com</a></div>
+  <div>LINKEDIN   : <a href="https://www.linkedin.com/in/pujarihemesh12?utm_source=share_via&utm_content=profile&utm_medium=member_android" target="_blank" class="text-cyberCyan underline">linkedin.com/in/pujarihemesh12</a></div>`,
+
+      projects: () => `
+  <div>1. <span class="text-cyberCyan font-bold">OP_AETHER_FIM</span>    : Real-time File Integrity Monitoring [SHA-256 Hashing]</div>
+  <div>2. <span class="text-neonGreen font-bold">OP_NET_SENTINEL</span> : Raw Socket Packet Analyzer & Flood Detector</div>
+  <div>3. <span class="text-amberAlert font-bold">OP_LOGIC_SYNTH</span> : Digital Logic Circuit Simulator & Truth Tables</div>
+  <div>4. <span class="text-cyberCyan font-bold">OP_CIPHER_VAULT</span> : Asymmetric Cryptographic Secret Enclave</div>
+  <div>5. <span class="text-neonGreen font-bold">OP-SENTINEL-AI</span> : <a href="https://github.com/Hemesh1211/OP-SENTINEL-AI" target="_blank" rel="noopener noreferrer" class="underline">Open repository</a></div>
+  <div>6. <span class="text-cyberCyan font-bold">OP_SILENT_TUNNEL</span> : <a href="https://github.com/Hemesh1211/-OP_SILENT_TUNNEL" target="_blank" rel="noopener noreferrer" class="underline">Open repository</a></div>`,
+
+      skills: () => `
+  <div>[01] SECURITY  : File Integrity Monitoring (FIM), SHA-256 Invariants, Packet Sniffing</div>
+  <div>[02] HARDWARE  : Digital Logic Synthesis, Combinational Circuit Modeling, K-Maps</div>
+  <div>[03] CODING    : Python 3, C, C++, Linux Shell Scripting, Socket Telemetry</div>
+  <div>[04] AUTOMATION: CertX Certified in AI Tools & Workflow Automation</div>`,
+
+      education: () => `
+  <div>[2024–2028] B.E. CSE      : <span class="text-white">SCSVMV University</span></div>
+  <div>[INTERMEDIATE] MPC         : <span class="text-amberAlert">Sri Sai Junior College</span> → <span class="text-amberAlert font-bold">80.8%</span></div>
+  <div>[JEE MAINS] Aakash Academy : <span class="text-neonGreen font-bold">91.963 %ile</span></div>
+  <div>STATUS                      : Active Defense & Systems Research</div>`,
+
+      certx: () => `
+  <div>CREDENTIAL: <span class="text-neonGreen font-bold">CertX Certified in AI Tools & Automation</span></div>
+  <div>SCOPE     : Workflow pipeline optimization, prompt-driven security scripting, and automated telemetry.</div>`,
+
+      linkedin: () => {
+        window.open('https://www.linkedin.com/in/pujarihemesh12?utm_source=share_via&utm_content=profile&utm_medium=member_android', '_blank');
+        return `<div>Opening external uplink to: <span class="text-cyberCyan">https://www.linkedin.com/in/pujarihemesh12</span></div>`;
+      },
+
+      email: () => {
+        window.location.href = 'mailto:pujarihemesh26@gmail.com';
+        return `<div>Opening secure mail uplink to: <span class="text-neonGreen">pujarihemesh26@gmail.com</span></div>`;
+      },
+
+      github: () => {
+        window.open('https://github.com/Hemesh1211', '_blank');
+        return `<div>Establishing uplink to Git Repository... <span class="text-cyberCyan font-bold">CONNECTED</span><br/>Opening: <span class="text-white underline">github.com/Hemesh1211</span></div>`;
+      },
+
+      ping: () => `64 bytes from sec-gateway.scsvmv: icmp_seq=1 ttl=64 time=12.8 ms [NOMINAL]`,
+
+      clear: () => { termBuffer.innerHTML = ''; return null; }
+    };
+
+    function executeCliCommand(rawCmd) {
+      const clean = rawCmd.trim();
+      if (!clean) return;
+      const echo = document.createElement('div');
+      echo.innerHTML = `<span class="text-slate-500">&gt;</span> <span class="text-white font-bold">${clean}</span>`;
+      termBuffer.appendChild(echo);
+      const parts = clean.split(' ');
+      const mainCmd = parts[0].toLowerCase();
+      const arg = parts[1] ? parts[1].toLowerCase() : '';
+
+      if (mainCmd === 'goto') {
+        const pageKeyMap = { hub:'home', home:'home', overview:'home', projects:'projects', skills:'skills', arsenal:'skills', academics:'academics', timeline:'academics', play:'play', game:'play', terminal:'terminal', cli:'terminal', contact:'contact', dispatch:'contact' };
+        if (pageKeyMap[arg]) {
+          const target = pageKeyMap[arg];
+          navigateToPage(target);
+          const fb = document.createElement('div');
+          fb.className = 'text-neonGreen font-bold';
+          fb.textContent = `[+] Triggering traction warp to page: ${target.toUpperCase()}`;
+          termBuffer.appendChild(fb);
+        } else {
+          const err = document.createElement('div');
+          err.className = 'text-dangerRed';
+          err.textContent = `Invalid page target '${arg}'. Available: home, projects, skills, academics, play, terminal, contact.`;
+          termBuffer.appendChild(err);
+          sndAlert();
+        }
+      } else if (commands[mainCmd]) {
+        const out = commands[mainCmd]();
+        if (out) {
+          const res = document.createElement('div');
+          res.innerHTML = out;
+          termBuffer.appendChild(res);
+        }
+        sndSuccess();
+      } else {
+        const err = document.createElement('div');
+        err.className = 'text-dangerRed';
+        err.textContent = `Directive '${clean}' not recognized. Type 'help' for instructions.`;
+        termBuffer.appendChild(err);
+        sndAlert();
+      }
+      termBuffer.scrollTop = termBuffer.scrollHeight;
+    }
+
+    termForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      executeCliCommand(termInput.value);
+      termInput.value = '';
+    });
+
+    document.querySelectorAll('.cmd-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const cmd = btn.getAttribute('data-cmd');
+        termInput.value = cmd;
+        executeCliCommand(cmd);
+      });
+    });
+
+    // SIMULATORS
+    const simBanner = document.getElementById('sim-telemetry-banner');
+    const simText = document.getElementById('sim-telemetry-text');
+    function flashSimulationAlert(msg, isAlert = false) {
+      simBanner.classList.remove('hidden');
+      simBanner.className = isAlert
+        ? "hud-box p-4 rounded-xl border border-dangerRed text-xs font-mono text-dangerRed animate-pulse"
+        : "hud-box p-4 rounded-xl border border-neonGreen text-xs font-mono text-neonGreen animate-pulse";
+      simText.innerHTML = msg;
+      if (isAlert) sndAlert(); else sndSuccess();
+      setTimeout(() => simBanner.classList.add('hidden'), 5000);
+    }
+    window.triggerFimTest = () => flashSimulationAlert(`[FIM TAMPER SIMULATOR] Non-authorized byte modification in '/etc/sys_auth.cfg'! Old SHA: 9f86... Changed to: e49a... Alert dispatched. Threat: HIGH.`, true);
+    window.triggerPacketCapture = () => flashSimulationAlert(`[PACKET SENTINEL] Captured Ethernet Frame #9182: TCP SYN flag detected from 192.168.1.108:52140 -> :443 [Payload: 0 bytes]. Buffer Nominal.`);
+    window.triggerLogicCycle = () => flashSimulationAlert(`[DIGITAL LOGIC] Priority Encoder 8-to-3 triggered with line D[6] Active. Output: Y[2:0] = 110, Valid = 1. Delay 2.8ns.`);
+    window.triggerCryptoHandshake = () => flashSimulationAlert(`[CIPHER ENCLAVE] Asymmetric handshake verified. Shared session key derived via ECDH. AES-256-GCM cipher active.`);
+
+    // PASSWORD FORT MINI-GAME
+    (() => {
+      const buttons = [...document.querySelectorAll('.fort-upgrade')];
+      const status = document.getElementById('fort-status');
+      const feedback = document.getElementById('fort-feedback');
+      const demoPassword = document.getElementById('fort-demo-password');
+      const explanations = {
+        length: 'Longer passphrases are harder to guess; a password manager can generate and store a strong one.',
+        patterns: 'Avoid common patterns and personal details to make guesses less predictable.',
+        unique: 'Unique passwords keep one exposed account from putting your other accounts at risk.',
+        mfa: 'Multi-factor authentication adds a separate checkpoint if a password is exposed.'
+      };
+
+      function createDemoPassword() {
+        const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*+-_';
+        const values = new Uint32Array(24);
+        if (window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(values);
+        else for (let i = 0; i < values.length; i++) values[i] = Math.floor(Math.random() * 0xffffffff);
+        return Array.from(values, value => alphabet[value % alphabet.length]).join('');
+      }
+
+      function updateDemoPassword() {
+        const hasLengthUpgrade = buttons.some(button => button.dataset.upgrade === 'length' && button.getAttribute('aria-pressed') === 'true');
+        if (hasLengthUpgrade && demoPassword.value.length < 16) demoPassword.value = createDemoPassword();
+      }
+
+      function refresh(message) {
+        const count = buttons.filter(button => button.getAttribute('aria-pressed') === 'true').length;
+        status.textContent = `Fort layers: ${count} / ${buttons.length}`;
+        feedback.textContent = message || (count === buttons.length
+          ? 'Fort upgraded! The fictional account now has all four protective layers.'
+          : 'Choose an upgrade to strengthen the demo account.');
+      }
+
+      buttons.forEach(button => button.addEventListener('click', () => {
+        const selected = button.getAttribute('aria-pressed') !== 'true';
+        button.setAttribute('aria-pressed', String(selected));
+        button.classList.toggle('border-neonGreen', selected);
+        button.classList.toggle('bg-neonGreen/10', selected);
+        button.querySelector('.fort-state').textContent = selected ? 'Layer added ✓' : 'Add layer +';
+        updateDemoPassword();
+        const note = button.dataset.upgrade === 'mfa'
+          ? ' MFA adds another verification step; it does not change the password.'
+          : button.dataset.upgrade === 'length'
+            ? ' A long randomized sample is shown in the field; it stays in this page only.'
+            : ' The password safety tip is applied to your fictional example only.';
+        refresh(explanations[button.dataset.upgrade] + note);
+      }));
+
+      document.getElementById('fort-reset').addEventListener('click', () => {
+        buttons.forEach(button => {
+          button.setAttribute('aria-pressed', 'false');
+          button.classList.remove('border-neonGreen', 'bg-neonGreen/10');
+          button.querySelector('.fort-state').textContent = 'Add layer +';
+        });
+        demoPassword.value = '';
+        refresh('Game reset. Enter a new fictional demo password to begin.');
+      });
+    })();
+
+    // CONTACT FORM
+    const contactForm = document.getElementById('contact-dispatch-form');
+    const contactResult = document.getElementById('form-transmission-result');
+    const dispatchBtn = document.getElementById('form-dispatch-btn');
+
+    contactForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = document.getElementById('form-name').value;
+      const email = document.getElementById('form-email').value;
+      const subject = document.getElementById('form-subject').value;
+      const message = document.getElementById('form-message').value;
+
+      // Construct the mailto link
+      const mailtoUrl = `mailto:pujarihemesh26@gmail.com?subject=[SECURE_TRANSMISSION] ${subject}&body=FROM: ${name} (${email})%0D%0A%0D%0A${message}`;
+
+      // Open the user's email client
+      window.location.href = mailtoUrl;
+
+      dispatchBtn.disabled = true;
+      dispatchBtn.innerHTML = `<span>[DISPATCHING ENCRYPTED PAYLOAD...]</span>`;
+      setTimeout(() => {
+        contactResult.classList.remove('hidden');
+        contactResult.className = "p-3 rounded bg-cyan-950/70 border border-cyberCyan/50 text-cyberCyan text-xs font-mono";
+        contactResult.innerHTML = `
+          <strong>[✓] TRANSMISSION HANDOFF COMPLETE</strong><br/>
+          The payload has been passed to your local mail client.<br/>
+          Please ensure you click 'Send' in your email app to complete the transmission.
+        `;
+        dispatchBtn.disabled = false;
+        dispatchBtn.innerHTML = `<span>TRANSMIT PACKET PAYLOAD</span>`;
+        contactForm.reset();
+        sndSuccess();
+      }, 750);
+    });
+  </script>
+</body>
+</html>
+
+
+
+
